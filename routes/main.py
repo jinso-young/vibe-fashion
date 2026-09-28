@@ -123,7 +123,7 @@ def index():
         if supabase:
             # 1. products 테이블에서 상품 정보 및 연관된 이미지, 카테고리 조회
             query = supabase.table("products").select("*, product_images(*), categories(*)")
-            query = query.eq("is_featured", True).limit(4)
+            query = query.eq("is_featured", True).order("created_at", desc=False).limit(8)
             response = query.execute()
 
             raw_products = response.data or []

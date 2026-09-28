@@ -19,6 +19,7 @@ DECLARE
   v_prod_3 UUID;
   v_prod_4 UUID;
   v_prod_5 UUID;
+  v_prod_6 UUID;
 BEGIN
 
   -- ----------------------------------------------------------------------------
@@ -158,11 +159,30 @@ BEGIN
     stock = EXCLUDED.stock
   RETURNING id INTO v_prod_5;
 
+  -- 상품 6: 모던 데일리 생활한복 원피스 셋업 (신상품 / 원피스)
+  INSERT INTO public.products (category_id, name, slug, description, price, sale_price, stock, status, is_featured)
+  VALUES (
+    v_cat_dress,
+    '모던 데일리 생활한복 원피스 셋업',
+    'modern-daily-hanbok',
+    '한국 전통의 우아한 선과 현대적인 모던 감성을 결합한 감각적인 데일리 생활한복입니다. 가벼운 코튼 린넨 블렌드로 일상 속에서 편안하고 특별하게 착용할 수 있습니다.',
+    89000,
+    69000,
+    40,
+    'active',
+    TRUE
+  )
+  ON CONFLICT (slug) DO UPDATE SET
+    price = EXCLUDED.price,
+    sale_price = EXCLUDED.sale_price,
+    stock = EXCLUDED.stock
+  RETURNING id INTO v_prod_6;
+
   -- ----------------------------------------------------------------------------
   -- 3. 첫 번째 상품 옵션 9개 (블랙/화이트/베이지 × S/M/L)
   -- ----------------------------------------------------------------------------
   -- 기존 옵션 초기화 후 재등록 (중복 방지)
-  DELETE FROM public.product_options WHERE product_id = v_prod_1;
+  DELETE FROM public.product_options WHERE product_id IN (v_prod_1, v_prod_6);
 
   INSERT INTO public.product_options (product_id, option_name, option_value, additional_price, stock)
   VALUES
@@ -177,24 +197,26 @@ BEGIN
     -- 베이지 계열 (S, M, L)
     (v_prod_1, '컬러/사이즈', '베이지 / S', 0, 10),
     (v_prod_1, '컬러/사이즈', '베이지 / M', 0, 10),
-    (v_prod_1, '컬러/사이즈', '베이지 / L', 0, 10);
+    (v_prod_1, '컬러/사이즈', '베이지 / L', 0, 10),
+
+    -- 생활한복 옵션
+    (v_prod_6, '사이즈', 'S (44~55)', 0, 15),
+    (v_prod_6, '사이즈', 'M (55~66)', 0, 20),
+    (v_prod_6, '사이즈', 'L (66~77)', 0, 5);
 
   -- ----------------------------------------------------------------------------
-  -- 4. 상품 썸네일 및 추가 이미지 등록 (picsum.photos 무료 이미지)
+  -- 4. 상품 썸네일 및 추가 이미지 등록
   -- ----------------------------------------------------------------------------
   -- 기존 이미지 초기화 후 재등록
-  DELETE FROM public.product_images WHERE product_id IN (v_prod_1, v_prod_2, v_prod_3, v_prod_4, v_prod_5);
+  DELETE FROM public.product_images WHERE product_id IN (v_prod_1, v_prod_2, v_prod_3, v_prod_4, v_prod_5, v_prod_6);
 
   INSERT INTO public.product_images (product_id, image_url, alt_text, display_order, is_thumbnail)
   VALUES
     -- 1번 상품 이미지 (베이직 크롭 티셔츠)
-    (v_prod_1, 'https://picsum.photos/id/1025/600/800', '베이직 크롭 티셔츠 메인 썸네일', 0, TRUE),
-    (v_prod_1, 'https://picsum.photos/id/1062/600/800', '베이직 크롭 티셔츠 디테일 컷 1', 1, FALSE),
-    (v_prod_1, 'https://picsum.photos/id/1069/600/800', '베이직 크롭 티셔츠 디테일 컷 2', 2, FALSE),
+    (v_prod_1, '/static/images/products/basic-crop-tshirt.png', '베이직 크롭 티셔츠 메인 썸네일', 0, TRUE),
 
     -- 2번 상품 이미지 (와이드 데님 팬츠)
-    (v_prod_2, 'https://picsum.photos/id/1005/600/800', '와이드 데님 팬츠 메인 썸네일', 0, TRUE),
-    (v_prod_2, 'https://picsum.photos/id/1011/600/800', '와이드 데님 팬츠 디테일 컷', 1, FALSE),
+    (v_prod_2, '/static/images/products/wide-denim-pants.png', '와이드 데님 팬츠 메인 썸네일', 0, TRUE),
 
     -- 3번 상품 이미지 (오버핏 코튼 자켓)
     (v_prod_3, 'https://picsum.photos/id/1059/600/800', '오버핏 코튼 자켓 메인 썸네일', 0, TRUE),
@@ -206,6 +228,9 @@ BEGIN
 
     -- 5번 상품 이미지 (미니멀 레더 코트 스니커즈)
     (v_prod_5, 'https://images.unsplash.com/photo-1549298916-b41d501d3772?auto=format&fit=crop&w=600&q=80', '미니멀 레더 코트 스니커즈 메인 썸네일', 0, TRUE),
-    (v_prod_5, 'https://images.unsplash.com/photo-1560769629-975ec94e6a86?auto=format&fit=crop&w=600&q=80', '미니멀 레더 코트 스니커즈 디테일 컷', 1, FALSE);
+    (v_prod_5, 'https://images.unsplash.com/photo-1560769629-975ec94e6a86?auto=format&fit=crop&w=600&q=80', '미니멀 레더 코트 스니커즈 디테일 컷', 1, FALSE),
+
+    -- 6번 상품 이미지 (모던 데일리 생활한복)
+    (v_prod_6, '/static/images/products/modern-hanbok.png', '모던 데일리 생활한복 메인 썸네일', 0, TRUE);
 
 END $$;
