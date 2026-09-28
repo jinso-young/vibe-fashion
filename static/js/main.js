@@ -5,8 +5,9 @@
  * 쇼핑몰의 장바구니, 위시리스트, 카테고리 필터링, 검색 기능을 담당합니다.
  */
 
-// 1. 장바구니 상태 관리 (인메모리 배열)
+// 1. 장바구니 및 위시리스트 상태 관리 (인메모리 배열)
 const cartState = [];
+const wishlistState = [];
 let wishlistCount = 0;
 
 /**
@@ -130,29 +131,116 @@ function showToast(message) {
  * 위시리스트(찜) 토글 함수
  * @param {HTMLElement} btn 버튼 요소
  * @param {string} productName 상품명
+ * @param {number|string} price 상품 가격
+ * @param {string} imageUrl 상품 이미지 URL
+ * @param {string} detailUrl 상세페이지 링크
  */
-function toggleWishlist(btn, productName) {
+function toggleWishlist(btn, productName, price, imageUrl, detailUrl) {
     const icon = btn.querySelector('i');
-    const badge = document.getElementById('wishlist-badge');
+    const existingIndex = wishlistState.findIndex(item => item.name === productName);
 
-    if (icon.classList.contains('bi-heart')) {
-        // 찜 추가
-        icon.classList.remove('bi-heart', 'text-secondary');
-        icon.classList.add('bi-heart-fill', 'text-danger');
-        wishlistCount++;
+    if (existingIndex === -1) {
+        // 위시리스트에 추가
+        wishlistState.push({
+            name: productName,
+            price: parsePrice(price),
+            imageUrl: imageUrl || '',
+            detailUrl: detailUrl || '#'
+        });
+
+        if (icon) {
+            icon.classList.remove('bi-heart', 'text-secondary');
+            icon.classList.add('bi-heart-fill', 'text-danger');
+        }
         showToast(`"${productName}" 상품을 위시리스트에 담았습니다 ❤️`);
     } else {
-        // 찜 취소
-        icon.classList.remove('bi-heart-fill', 'text-danger');
-        icon.classList.add('bi-heart', 'text-secondary');
-        wishlistCount = Math.max(0, wishlistCount - 1);
+        // 위시리스트에서 제거
+        wishlistState.splice(existingIndex, 1);
+
+        if (icon) {
+            icon.classList.remove('bi-heart-fill', 'text-danger');
+            icon.classList.add('bi-heart', 'text-secondary');
+        }
         showToast(`"${productName}" 상품을 위시리스트에서 제외했습니다.`);
     }
 
-    if (badge) {
-        badge.textContent = wishlistCount;
-        badge.style.display = wishlistCount > 0 ? 'inline-block' : 'none';
+    updateWishlistUI();
+}
+
+/**
+ * 위시리스트에서 특정 아이템을 제거하는 함수
+ * @param {number} index
+ */
+function removeFromWishlist(index) {
+    if (index >= 0 && index < wishlistState.length) {
+        const removed = wishlistState.splice(index, 1)[0];
+        
+        // 카드 내의 하트 버튼 아이콘 동기화
+        const cards = document.querySelectorAll('.product-card-col');
+        cards.forEach(card => {
+            const cardName = card.getAttribute('data-name');
+            if (cardName === removed.name) {
+                const btn = card.querySelector('.btn-wishlist i');
+                if (btn) {
+                    btn.classList.remove('bi-heart-fill', 'text-danger');
+                    btn.classList.add('bi-heart', 'text-secondary');
+                }
+            }
+        });
+
+        updateWishlistUI();
     }
+}
+
+/**
+ * 위시리스트 UI(오프캔버스 내용 및 뱃지 숫자) 갱신
+ */
+function updateWishlistUI() {
+    const badge = document.getElementById('wishlist-badge');
+    const emptyMsg = document.getElementById('wishlist-empty-msg');
+    const list = document.getElementById('wishlist-list');
+
+    // 뱃지 숫자 업데이트
+    if (badge) {
+        badge.textContent = wishlistState.length;
+        badge.style.display = wishlistState.length > 0 ? 'inline-block' : 'none';
+    }
+
+    if (!list || !emptyMsg) return;
+
+    if (wishlistState.length === 0) {
+        emptyMsg.style.display = 'block';
+        list.innerHTML = '';
+        return;
+    }
+
+    emptyMsg.style.display = 'none';
+    let html = '';
+
+    wishlistState.forEach((item, idx) => {
+        const itemPrice = parsePrice(item.price);
+        html += `
+            <li class="list-group-item d-flex align-items-center justify-content-between px-0 py-3 border-bottom">
+                <div class="d-flex align-items-center gap-3">
+                    <img src="${item.imageUrl}" alt="${item.name}" class="rounded" style="width: 50px; height: 50px; object-fit: cover;">
+                    <div>
+                        <a href="${item.detailUrl}" class="fw-bold small text-dark text-decoration-none text-truncate d-block" style="max-width: 150px;">${item.name}</a>
+                        <div class="text-muted small">${itemPrice.toLocaleString()}원</div>
+                    </div>
+                </div>
+                <div class="d-flex align-items-center gap-1">
+                    <button type="button" class="btn btn-sm btn-outline-dark" onclick="addToCart('${item.name}', ${itemPrice}, '${item.imageUrl}')" title="장바구니 담기">
+                        <i class="bi bi-bag-plus"></i>
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-danger border-0" onclick="removeFromWishlist(${idx})" title="삭제">
+                        <i class="bi bi-trash"></i>
+                    </button>
+                </div>
+            </li>
+        `;
+    });
+
+    list.innerHTML = html;
 }
 
 /**

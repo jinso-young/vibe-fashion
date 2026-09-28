@@ -104,9 +104,9 @@ body {
 
 .hero-section {
     background: linear-gradient(180deg, #382011 0%, #2b180d 50%, #1f1109 100%) !important;
-    min-height: 560px;
-    padding-top: 4.5rem;
-    padding-bottom: 4.5rem;
+    min-height: 480px;
+    padding-top: 5rem;
+    padding-bottom: 5rem;
     text-align: center;
     position: relative;
 }
@@ -117,8 +117,87 @@ body {
     left: 0;
     right: 0;
     bottom: 0;
-    background: radial-gradient(circle at 50% 25%, rgba(217, 142, 84, 0.18), transparent 65%);
+    background: radial-gradient(circle at 50% 30%, rgba(217, 142, 84, 0.22), transparent 70%);
     pointer-events: none;
+}
+
+/* 상단 트렌디 라벨 배지 */
+.hero-badge {
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(217, 142, 84, 0.35);
+    backdrop-filter: blur(8px);
+    transition: all 0.3s ease;
+}
+
+.hero-badge:hover {
+    background: rgba(255, 255, 255, 0.12);
+    border-color: rgba(217, 142, 84, 0.6);
+}
+
+.badge-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background-color: #f7b977;
+    box-shadow: 0 0 10px #f7b977;
+}
+
+.hero-tag-text {
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 0.16em;
+    color: #f7b977;
+}
+
+/* 트렌디 헤드라인 타이포그래피 */
+.hero-title {
+    font-size: clamp(2.3rem, 5.5vw, 4.2rem) !important;
+    font-weight: 900 !important;
+    letter-spacing: -0.04em !important;
+    line-height: 1.25 !important;
+    color: #ffffff !important;
+    text-shadow: 0 4px 25px rgba(0, 0, 0, 0.6);
+}
+
+.hero-title::before {
+    display: none !important;
+}
+
+.hero-title-sub {
+    font-family: var(--font-serif);
+    font-size: clamp(0.95rem, 2.2vw, 1.4rem);
+    font-weight: 600;
+    letter-spacing: 0.22em;
+    color: #e5a663;
+    text-transform: uppercase;
+    margin-bottom: 0.6rem;
+    text-shadow: none;
+}
+
+.hero-description {
+    font-size: 1.125rem;
+    color: rgba(255, 245, 235, 0.82) !important;
+    max-width: 680px;
+    line-height: 1.8;
+    letter-spacing: -0.01em;
+}
+
+.hero-cta-btn {
+    letter-spacing: 0.06em;
+}
+
+.hero-cta-btn::before {
+    display: none !important;
+}
+
+.stat-num {
+    letter-spacing: -0.02em;
+}
+
+.hero-stats-row {
+    max-width: 650px;
+    margin-left: auto;
+    margin-right: auto;
 }
 
 .hero-section .container {
@@ -126,58 +205,6 @@ body {
     flex-direction: column;
     align-items: center;
     justify-content: center;
-}
-
-.hero-section .row {
-    justify-content: center !important;
-    width: 100%;
-}
-
-.hero-section .col-lg-7 {
-    text-align: center !important;
-    margin: 0 auto !important;
-    max-width: 820px;
-    width: 100%;
-}
-
-.hero-section .badge.bg-warning {
-    background-color: rgba(217, 142, 84, 0.18) !important;
-    color: #f7b977 !important;
-    border: 1px solid #d98e54;
-    font-size: 0.85rem;
-    padding: 0.5rem 1.25rem !important;
-    display: inline-block;
-    margin-bottom: 1.25rem !important;
-}
-
-.hero-section .badge.bg-warning i {
-    color: #f7b977 !important;
-}
-
-.hero-section h1 {
-    font-size: 0 !important;
-    margin-bottom: 1.5rem !important;
-    line-height: 1.25;
-}
-
-.hero-section h1::before {
-    content: '당신의 일상을 스타일리시하게';
-    font-size: clamp(2rem, 5.5vw, 3.6rem);
-    font-weight: 900;
-    letter-spacing: -0.03em;
-    display: block;
-    font-family: var(--font-sans);
-    color: #ffffff;
-    text-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
-}
-
-.hero-section .lead {
-    font-size: 1.125rem;
-    color: rgba(255, 245, 235, 0.85) !important;
-    max-width: 620px;
-    margin: 0 auto 2rem auto !important;
-    padding: 0 !important;
-    line-height: 1.7;
 }
 
 .hero-section .d-flex.flex-wrap {
@@ -190,17 +217,10 @@ body {
     border-color: var(--brand-camel) !important;
     color: #ffffff !important;
     font-weight: 700 !important;
-    font-size: 0 !important;
     padding: 0.95rem 2.25rem !important;
     border-radius: 50rem !important;
     box-shadow: 0 8px 24px rgba(178, 104, 50, 0.45) !important;
     transition: all 0.25s ease-in-out !important;
-}
-
-.hero-section .btn-warning::before {
-    content: '지금 쇼핑하기';
-    font-size: 1.05rem;
-    display: inline-block;
 }
 
 .hero-section .btn-warning:hover {

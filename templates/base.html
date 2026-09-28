@@ -63,7 +63,7 @@
                     </button>
 
                     <!-- 위시리스트 아이콘 -->
-                    <a href="javascript:void(0)" class="text-white text-decoration-none position-relative p-2" title="위시리스트" onclick="alert('위시리스트 기능이 준비 중입니다!')">
+                    <a href="javascript:void(0)" class="text-white text-decoration-none position-relative p-2" title="위시리스트" data-bs-toggle="offcanvas" data-bs-target="#wishlistOffcanvas">
                         <i class="bi bi-heart fs-5"></i>
                         <span id="wishlist-badge" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" style="display: none;">0</span>
                     </a>
@@ -175,6 +175,33 @@
                         <span class="badge bg-light text-dark border me-1 cursor-pointer" onclick="quickSearch('부츠')">#부츠</span>
                     </div>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- 오프캔버스: 위시리스트 미리보기 서랍        -->
+    <!-- ========================================== -->
+    <div class="offcanvas offcanvas-end" tabindex="-1" id="wishlistOffcanvas" aria-labelledby="wishlistOffcanvasLabel">
+        <div class="offcanvas-header border-bottom">
+            <h5 class="offcanvas-title fw-bold" id="wishlistOffcanvasLabel">
+                <i class="bi bi-heart-fill text-danger me-2"></i>나의 위시리스트
+            </h5>
+            <button type="button" class="btn-close text-reset" data-bs-dismiss="offcanvas" aria-label="닫기"></button>
+        </div>
+        <div class="offcanvas-body d-flex flex-column">
+            <div id="wishlist-items-container" class="flex-grow-1">
+                <div id="wishlist-empty-msg" class="text-center py-5 text-muted">
+                    <i class="bi bi-heart fs-1 d-block mb-3 opacity-50"></i>
+                    위시리스트가 비어 있습니다.<br>
+                    <span class="small">마음에 드는 상품의 하트를 눌러보세요!</span>
+                </div>
+                <ul id="wishlist-list" class="list-group list-group-flush"></ul>
+            </div>
+            <div class="border-top pt-3 mt-auto">
+                <button class="btn btn-outline-dark w-100 py-2 fw-medium mb-2" data-bs-dismiss="offcanvas" onclick="location.href='{{ url_for('main.index') }}#products-section'">
+                    상품 더 둘러보기
+                </button>
             </div>
         </div>
     </div>
