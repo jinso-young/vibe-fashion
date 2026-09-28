@@ -21,6 +21,7 @@ DECLARE
   v_prod_5 UUID;
   v_prod_6 UUID;
   v_prod_7 UUID;
+  v_prod_8 UUID;
 BEGIN
 
   -- ----------------------------------------------------------------------------
@@ -198,11 +199,30 @@ BEGIN
     stock = EXCLUDED.stock
   RETURNING id INTO v_prod_7;
 
+  -- 상품 8: 클래식 스트라이프 셔츠 (상의)
+  INSERT INTO public.products (category_id, name, slug, description, price, sale_price, stock, status, is_featured)
+  VALUES (
+    v_cat_top,
+    '클래식 스트라이프 셔츠',
+    'classic-stripe-shirt',
+    '감각적인 핀스트라이프 패턴과 깔끔한 카라 라인이 돋보이는 모던 와이셔츠입니다. 단독 착용은 물론 슬랙스나 데님 팬츠와 매치하여 포멀하면서도 세련된 데일리룩을 완성합니다.',
+    39000,
+    NULL,
+    80,
+    'active',
+    TRUE
+  )
+  ON CONFLICT (slug) DO UPDATE SET
+    price = EXCLUDED.price,
+    sale_price = EXCLUDED.sale_price,
+    stock = EXCLUDED.stock
+  RETURNING id INTO v_prod_8;
+
   -- ----------------------------------------------------------------------------
   -- 3. 첫 번째 상품 옵션 9개 (블랙/화이트/베이지 × S/M/L)
   -- ----------------------------------------------------------------------------
   -- 기존 옵션 초기화 후 재등록 (중복 방지)
-  DELETE FROM public.product_options WHERE product_id IN (v_prod_1, v_prod_6, v_prod_7);
+  DELETE FROM public.product_options WHERE product_id IN (v_prod_1, v_prod_6, v_prod_7, v_prod_8);
 
   INSERT INTO public.product_options (product_id, option_name, option_value, additional_price, stock)
   VALUES
@@ -225,13 +245,17 @@ BEGIN
     (v_prod_6, '사이즈', 'L (66~77)', 0, 5),
 
     -- 가방 옵션
-    (v_prod_7, '색상', '아이보리/블랙', 0, 50);
+    (v_prod_7, '색상', '아이보리/블랙', 0, 50),
+
+    -- 와이셔츠 옵션 (프리사이즈, 하늘색 / 흰색)
+    (v_prod_8, '색상/사이즈', '하늘색 / FREE', 0, 40),
+    (v_prod_8, '색상/사이즈', '흰색 / FREE', 0, 40);
 
   -- ----------------------------------------------------------------------------
   -- 4. 상품 썸네일 및 추가 이미지 등록
   -- ----------------------------------------------------------------------------
   -- 기존 이미지 초기화 후 재등록
-  DELETE FROM public.product_images WHERE product_id IN (v_prod_1, v_prod_2, v_prod_3, v_prod_4, v_prod_5, v_prod_6, v_prod_7);
+  DELETE FROM public.product_images WHERE product_id IN (v_prod_1, v_prod_2, v_prod_3, v_prod_4, v_prod_5, v_prod_6, v_prod_7, v_prod_8);
 
   INSERT INTO public.product_images (product_id, image_url, alt_text, display_order, is_thumbnail)
   VALUES
@@ -257,6 +281,9 @@ BEGIN
     (v_prod_6, '/static/images/products/modern-hanbok.png', '모던 데일리 생활한복 메인 썸네일', 0, TRUE),
 
     -- 7번 상품 이미지 (캔버스 스트랩 버킷백)
-    (v_prod_7, '/static/images/products/canvas-bucket-bag.png', '캔버스 스트랩 버킷백 메인 썸네일', 0, TRUE);
+    (v_prod_7, '/static/images/products/canvas-bucket-bag.png', '캔버스 스트랩 버킷백 메인 썸네일', 0, TRUE),
+
+    -- 8번 상품 이미지 (클래식 스트라이프 셔츠)
+    (v_prod_8, '/static/images/products/stripe-shirt.png', '클래식 스트라이프 셔츠 메인 썸네일', 0, TRUE);
 
 END $$;
