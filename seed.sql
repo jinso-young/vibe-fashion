@@ -18,6 +18,7 @@ DECLARE
   v_prod_2 UUID;
   v_prod_3 UUID;
   v_prod_4 UUID;
+  v_prod_5 UUID;
 BEGIN
 
   -- ----------------------------------------------------------------------------
@@ -138,6 +139,25 @@ BEGIN
     stock = EXCLUDED.stock
   RETURNING id INTO v_prod_4;
 
+  -- 상품 5: 미니멀 레더 코트 스니커즈 (신발 - 크롭 티셔츠, 와이드 데님, 코튼 자켓과 어울리는 슈즈)
+  INSERT INTO public.products (category_id, name, slug, description, price, sale_price, stock, status, is_featured)
+  VALUES (
+    v_cat_shoes,
+    '미니멀 레더 코트 스니커즈',
+    'minimal-leather-sneakers',
+    '크롭 티셔츠, 와이드 데님 팬츠, 오버핏 코튼 자켓 등 캐주얼과 미니멀 룩 어디에나 완벽하게 매치되는 천연 소가죽 클래식 스니커즈입니다.',
+    69000,
+    49000,
+    70,
+    'active',
+    TRUE
+  )
+  ON CONFLICT (slug) DO UPDATE SET
+    price = EXCLUDED.price,
+    sale_price = EXCLUDED.sale_price,
+    stock = EXCLUDED.stock
+  RETURNING id INTO v_prod_5;
+
   -- ----------------------------------------------------------------------------
   -- 3. 첫 번째 상품 옵션 9개 (블랙/화이트/베이지 × S/M/L)
   -- ----------------------------------------------------------------------------
@@ -163,7 +183,7 @@ BEGIN
   -- 4. 상품 썸네일 및 추가 이미지 등록 (picsum.photos 무료 이미지)
   -- ----------------------------------------------------------------------------
   -- 기존 이미지 초기화 후 재등록
-  DELETE FROM public.product_images WHERE product_id IN (v_prod_1, v_prod_2, v_prod_3, v_prod_4);
+  DELETE FROM public.product_images WHERE product_id IN (v_prod_1, v_prod_2, v_prod_3, v_prod_4, v_prod_5);
 
   INSERT INTO public.product_images (product_id, image_url, alt_text, display_order, is_thumbnail)
   VALUES
@@ -182,6 +202,10 @@ BEGIN
 
     -- 4번 상품 이미지 (플로럴 미디 원피스)
     (v_prod_4, 'https://picsum.photos/id/1012/600/800', '플로럴 미디 원피스 메인 썸네일', 0, TRUE),
-    (v_prod_4, 'https://picsum.photos/id/1027/600/800', '플로럴 미디 원피스 디테일 컷', 1, FALSE);
+    (v_prod_4, 'https://picsum.photos/id/1027/600/800', '플로럴 미디 원피스 디테일 컷', 1, FALSE),
+
+    -- 5번 상품 이미지 (미니멀 레더 코트 스니커즈)
+    (v_prod_5, 'https://images.unsplash.com/photo-1549298916-b41d501d3772?auto=format&fit=crop&w=600&q=80', '미니멀 레더 코트 스니커즈 메인 썸네일', 0, TRUE),
+    (v_prod_5, 'https://images.unsplash.com/photo-1560769629-975ec94e6a86?auto=format&fit=crop&w=600&q=80', '미니멀 레더 코트 스니커즈 디테일 컷', 1, FALSE);
 
 END $$;

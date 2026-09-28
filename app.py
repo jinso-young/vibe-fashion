@@ -65,3 +65,7 @@ def create_app(config_override=None):
         return render_template("404.html"), 404
 
     return app
+
+
+# Azure App Service 및 Gunicorn 기본 진입점 (app:app 지원)
+app = create_app()
