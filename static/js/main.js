@@ -175,8 +175,19 @@ function filterProducts(category, btnClicked) {
     // 카드 표시/숨김 처리
     const cards = document.querySelectorAll('.product-card-col');
     cards.forEach(card => {
-        const itemCategory = card.getAttribute('data-category');
-        if (category === 'all' || itemCategory === category) {
+        const itemCategory = (card.getAttribute('data-category') || '').toUpperCase();
+        let isMatch = false;
+
+        if (category === 'all') {
+            isMatch = true;
+        } else if (category === 'ETC') {
+            // 기타: 신발(SHOES), 가방(BAG), 액세서리(ACC) 등 포함
+            isMatch = ['SHOES', 'BAG', 'ACC', 'ETC'].includes(itemCategory);
+        } else {
+            isMatch = itemCategory === category;
+        }
+
+        if (isMatch) {
             card.style.display = 'block';
         } else {
             card.style.display = 'none';

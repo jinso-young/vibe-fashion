@@ -20,6 +20,7 @@ DECLARE
   v_prod_4 UUID;
   v_prod_5 UUID;
   v_prod_6 UUID;
+  v_prod_7 UUID;
 BEGIN
 
   -- ----------------------------------------------------------------------------
@@ -178,11 +179,30 @@ BEGIN
     stock = EXCLUDED.stock
   RETURNING id INTO v_prod_6;
 
+  -- 상품 7: 캔버스 스트랩 버킷백 (가방/기타)
+  INSERT INTO public.products (category_id, name, slug, description, price, sale_price, stock, status, is_featured)
+  VALUES (
+    v_cat_bag,
+    '캔버스 스트랩 버킷백',
+    'canvas-strap-bucket-bag',
+    '탄탄한 코튼 캔버스 원단과 고급스러운 블랙 레더 스트랩 배색이 돋보이는 모던 캐주얼 버킷백입니다. 넉넉한 수납공간과 가벼운 무게감으로 일상 데일리백으로 제격입니다.',
+    58000,
+    39000,
+    50,
+    'active',
+    TRUE
+  )
+  ON CONFLICT (slug) DO UPDATE SET
+    price = EXCLUDED.price,
+    sale_price = EXCLUDED.sale_price,
+    stock = EXCLUDED.stock
+  RETURNING id INTO v_prod_7;
+
   -- ----------------------------------------------------------------------------
   -- 3. 첫 번째 상품 옵션 9개 (블랙/화이트/베이지 × S/M/L)
   -- ----------------------------------------------------------------------------
   -- 기존 옵션 초기화 후 재등록 (중복 방지)
-  DELETE FROM public.product_options WHERE product_id IN (v_prod_1, v_prod_6);
+  DELETE FROM public.product_options WHERE product_id IN (v_prod_1, v_prod_6, v_prod_7);
 
   INSERT INTO public.product_options (product_id, option_name, option_value, additional_price, stock)
   VALUES
@@ -202,13 +222,16 @@ BEGIN
     -- 생활한복 옵션
     (v_prod_6, '사이즈', 'S (44~55)', 0, 15),
     (v_prod_6, '사이즈', 'M (55~66)', 0, 20),
-    (v_prod_6, '사이즈', 'L (66~77)', 0, 5);
+    (v_prod_6, '사이즈', 'L (66~77)', 0, 5),
+
+    -- 가방 옵션
+    (v_prod_7, '색상', '아이보리/블랙', 0, 50);
 
   -- ----------------------------------------------------------------------------
   -- 4. 상품 썸네일 및 추가 이미지 등록
   -- ----------------------------------------------------------------------------
   -- 기존 이미지 초기화 후 재등록
-  DELETE FROM public.product_images WHERE product_id IN (v_prod_1, v_prod_2, v_prod_3, v_prod_4, v_prod_5, v_prod_6);
+  DELETE FROM public.product_images WHERE product_id IN (v_prod_1, v_prod_2, v_prod_3, v_prod_4, v_prod_5, v_prod_6, v_prod_7);
 
   INSERT INTO public.product_images (product_id, image_url, alt_text, display_order, is_thumbnail)
   VALUES
@@ -231,6 +254,9 @@ BEGIN
     (v_prod_5, 'https://images.unsplash.com/photo-1560769629-975ec94e6a86?auto=format&fit=crop&w=600&q=80', '미니멀 레더 코트 스니커즈 디테일 컷', 1, FALSE),
 
     -- 6번 상품 이미지 (모던 데일리 생활한복)
-    (v_prod_6, '/static/images/products/modern-hanbok.png', '모던 데일리 생활한복 메인 썸네일', 0, TRUE);
+    (v_prod_6, '/static/images/products/modern-hanbok.png', '모던 데일리 생활한복 메인 썸네일', 0, TRUE),
+
+    -- 7번 상품 이미지 (캔버스 스트랩 버킷백)
+    (v_prod_7, '/static/images/products/canvas-bucket-bag.png', '캔버스 스트랩 버킷백 메인 썸네일', 0, TRUE);
 
 END $$;
