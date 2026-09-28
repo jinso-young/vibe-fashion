@@ -1,0 +1,324 @@
+{% extends "base.html" %}
+
+{% block title %}VIBE-FASHION | 2026 봄/여름 컬렉션{% endblock %}
+
+{% block content %}
+<!-- ============================================================== -->
+<!-- 1. 히어로 섹션 (Hero Section)                                    -->
+<!-- ============================================================== -->
+<!-- 
+  Bootstrap의 비주얼 컴포넌트를 활용하여 강렬한 첫인상을 주는 메인 배너입니다.
+  배경은 세련된 다크 테마 그라디언트와 패션 무드를 담은 배너로 구성됩니다.
+-->
+<section class="hero-section text-white d-flex align-items-center position-relative overflow-hidden">
+    <div class="hero-overlay"></div>
+    <div class="container position-relative py-5 my-lg-5">
+        <div class="row align-items-center gy-5">
+            <div class="col-lg-7 text-center text-lg-start">
+                <span class="badge bg-warning text-dark px-3 py-2 rounded-pill fw-bold mb-3 fs-6">
+                    <i class="bi bi-fire me-1"></i> 2026 S/S NEW ARRIVALS
+                </span>
+                <h1 class="display-3 fw-black mb-3 lh-sm tracking-tight">
+                    당신의 일상에<br>
+                    <span class="text-gradient">특별한 VIBE</span>를 입히다.
+                </h1>
+                <p class="lead text-light text-opacity-75 mb-4 pe-lg-5 fs-5">
+                    간결하지만 확실한 존재감. VIBE-FASHION이 제안하는 미니멀리즘과 
+                    컨템포러리 감성의 새로운 시즌 컬렉션을 지금 바로 만나보세요.
+                </p>
+                <div class="d-flex flex-wrap gap-3 justify-content-center justify-content-lg-start">
+                    <a href="#products-section" class="btn btn-warning btn-lg px-4 py-3 fw-bold rounded-pill shadow-lg">
+                        신상품 보러가기 <i class="bi bi-arrow-right ms-2"></i>
+                    </a>
+                    <a href="#lookbook-section" class="btn btn-outline-light btn-lg px-4 py-3 fw-bold rounded-pill">
+                        시즌 룩북 보기
+                    </a>
+                </div>
+
+                <!-- 실시간 쇼핑몰 통계 뱃지 -->
+                <div class="row pt-5 g-3 text-white-50 border-top border-white border-opacity-10 mt-4">
+                    <div class="col-4">
+                        <div class="fs-4 fw-bold text-white">99.4%</div>
+                        <div class="small">고객 만족도</div>
+                    </div>
+                    <div class="col-4">
+                        <div class="fs-4 fw-bold text-white">무료배송</div>
+                        <div class="small">전 상품 적용</div>
+                    </div>
+                    <div class="col-4">
+                        <div class="fs-4 fw-bold text-white">당일출고</div>
+                        <div class="small">14시 이전 주문</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 히어로 우측 메인 비주얼 이미지 카드 -->
+            <div class="col-lg-5 text-center">
+                <div class="hero-image-wrapper mx-auto">
+                    <!-- picsum.photos 패션 느낌의 대표 비주얼 이미지 -->
+                    <img src="https://picsum.photos/seed/vibe_hero_fashion/700/850" 
+                         alt="VIBE-FASHION 대표 컬렉션" 
+                         class="img-fluid rounded-4 shadow-2xl hero-banner-img">
+                    <div class="hero-floating-card shadow-lg rounded-3 p-3 text-start bg-white text-dark">
+                        <div class="d-flex align-items-center gap-3">
+                            <span class="badge bg-danger rounded-circle p-2"><i class="bi bi-tag-fill text-white"></i></span>
+                            <div>
+                                <div class="fw-bold fs-6">시즌 오픈 특별 혜택</div>
+                                <div class="text-muted small">신규 회원가입 시 15% 즉시할인 쿠폰 증정</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ============================================================== -->
+<!-- 2. 쇼핑 혜택 바 (Features Banner)                               -->
+<!-- ============================================================== -->
+<section class="py-4 bg-white border-bottom shadow-sm">
+    <div class="container">
+        <div class="row g-3 text-center">
+            <div class="col-md-3 col-6 d-flex align-items-center justify-content-center gap-2">
+                <i class="bi bi-truck fs-3 text-primary"></i>
+                <div class="text-start">
+                    <div class="fw-bold small">전국 무료 배송</div>
+                    <div class="text-muted text-xs">5만원 이상 구매 시</div>
+                </div>
+            </div>
+            <div class="col-md-3 col-6 d-flex align-items-center justify-content-center gap-2">
+                <i class="bi bi-arrow-repeat fs-3 text-success"></i>
+                <div class="text-start">
+                    <div class="fw-bold small">7일 안심 무료 반품</div>
+                    <div class="text-muted text-xs">단순 변심도 무료 반품</div>
+                </div>
+            </div>
+            <div class="col-md-3 col-6 d-flex align-items-center justify-content-center gap-2">
+                <i class="bi bi-shield-check fs-3 text-warning"></i>
+                <div class="text-start">
+                    <div class="fw-bold small">100% 정품 보증</div>
+                    <div class="text-muted text-xs">자체 제작 및 인증 원단</div>
+                </div>
+            </div>
+            <div class="col-md-3 col-6 d-flex align-items-center justify-content-center gap-2">
+                <i class="bi bi-headset fs-3 text-danger"></i>
+                <div class="text-start">
+                    <div class="fw-bold small">24시간 고객 센터</div>
+                    <div class="text-muted text-xs">언제든 친절 상담</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ============================================================== -->
+<!-- 3. 추천 상품 목록 섹션 (picsum.photos 더미 상품 카드 4개)         -->
+<!-- ============================================================== -->
+{# 
+  Flask 라우트(routes/main.py)에서 넘겨받은 `products` 리스트를 
+  Jinja2 반복문 {% for product in products %} 으로 순회하며 카드를 생성합니다.
+#}
+<section id="products-section" class="py-5">
+    <div class="container py-3">
+        <!-- 섹션 헤더 -->
+        <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-end mb-4 border-bottom pb-3">
+            <div>
+                <span class="text-danger fw-bold small text-uppercase tracking-wider">TRENDING NOW</span>
+                <h2 class="fw-black mb-1">인기 추천 패션 아이템</h2>
+                <p class="text-muted mb-0 small">이번 주 VIBE-FASHION 회원들이 가장 많이 찾은 베스트 4가지 상품</p>
+            </div>
+            <!-- 카테고리 필터 탭 (UI 데모) -->
+            <div class="mt-3 mt-md-0">
+                <div class="btn-group btn-group-sm" role="group" aria-label="상품 카테고리 필터">
+                    <button type="button" class="btn btn-dark active" onclick="filterProducts('all', this)">전체</button>
+                    <button type="button" class="btn btn-outline-dark" onclick="filterProducts('OUTER', this)">아우터</button>
+                    <button type="button" class="btn btn-outline-dark" onclick="filterProducts('TOP', this)">상의</button>
+                    <button type="button" class="btn btn-outline-dark" onclick="filterProducts('BOTTOM', this)">하의</button>
+                    <button type="button" class="btn btn-outline-dark" onclick="filterProducts('SHOES', this)">신발</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 상품 카드 그리드 (Bootstrap Grid 4열 배치) -->
+        <div class="row g-4" id="productGrid">
+            {% for product in products %}
+            <div class="col-xl-3 col-lg-3 col-md-6 col-sm-6 product-card-col" data-category="{{ product.category }}" data-name="{{ product.name }}">
+                <div class="card h-100 border-0 shadow-sm product-card transition-all">
+                    <!-- 상품 이미지 영역 (thumbnail_url) -->
+                    <div class="position-relative overflow-hidden card-img-wrapper">
+                        {% if product.discount_rate %}
+                        <span class="position-absolute top-0 start-0 m-3 badge bg-danger fw-bold px-2 py-1 shadow-sm" style="z-index: 2;">
+                            SALE {{ product.discount_rate }}%
+                        </span>
+                        {% else %}
+                        <span class="position-absolute top-0 start-0 m-3 badge bg-dark fw-bold px-2 py-1 shadow-sm" style="z-index: 2;">
+                            HOT
+                        </span>
+                        {% endif %}
+
+                        <!-- 찜하기(위시리스트) 하트 버튼 -->
+                        <button type="button" 
+                                class="btn btn-light btn-sm rounded-circle position-absolute top-0 end-0 m-3 shadow-sm btn-wishlist" 
+                                style="z-index: 2;"
+                                onclick="toggleWishlist(this, '{{ product.name }}')"
+                                title="찜하기">
+                            <i class="bi bi-heart text-secondary"></i>
+                        </button>
+
+                        <!-- 상품 이미지 링크 (클릭 시 상세 페이지로 이동) -->
+                        <a href="{{ url_for('main.product_detail', product_id=product.id) }}" class="d-block text-decoration-none">
+                            <img src="{{ product.thumbnail_url }}" 
+                                 class="card-img-top product-img" 
+                                 alt="{{ product.name }}"
+                                 loading="lazy">
+                        </a>
+
+                        <!-- 빠른 장바구니 담기 오버레이 버튼 -->
+                        <div class="quick-action-overlay">
+                            <button type="button" 
+                                    class="btn btn-dark btn-sm w-100 rounded-0 py-2 shadow fw-medium"
+                                    onclick="addToCart('{{ product.name }}', {{ product.price }}, '{{ product.thumbnail_url }}')">
+                                <i class="bi bi-bag-plus me-1"></i> 장바구니 담기
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- 상품 정보 본문 -->
+                    <div class="card-body d-flex flex-column p-3">
+                        <!-- 카테고리 -->
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <span class="text-muted text-uppercase text-xs fw-semibold">{{ product.category_name }}</span>
+                            <div class="text-warning text-xs">
+                                <i class="bi bi-star-fill"></i>
+                                <span class="text-dark fw-bold ms-1">{{ product.rating }}</span>
+                                <span class="text-muted">({{ product.review_count }})</span>
+                            </div>
+                        </div>
+
+                        <!-- 상품명 (상세 링크) -->
+                        <h5 class="card-title fs-6 fw-bold mb-2">
+                            <a href="{{ url_for('main.product_detail', product_id=product.id) }}" class="text-dark text-decoration-none text-truncate d-block">
+                                {{ product.name }}
+                            </a>
+                        </h5>
+
+                        <!-- 상품 간단 설명 -->
+                        {% if product.description %}
+                        <p class="card-text text-secondary small line-clamp-2 mb-3">
+                            {{ product.description }}
+                        </p>
+                        {% endif %}
+
+                        <!-- 가격 영역 -->
+                        <div class="mt-auto pt-2 border-top">
+                            <div class="d-flex align-items-baseline gap-2">
+                                {% if product.discount_rate %}
+                                <span class="text-danger fw-black fs-5">{{ product.discount_rate }}%</span>
+                                <span class="fw-bold fs-5 text-dark">{{ product.formatted_price }}</span>
+                                <span class="text-muted text-decoration-line-through small">{{ product.formatted_original_price }}</span>
+                                {% else %}
+                                <span class="fw-bold fs-5 text-dark">{{ product.formatted_price }}</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 카드 푸터: 상세 보기 버튼 -->
+                    <div class="card-footer bg-white border-0 pt-0 pb-3 px-3">
+                        <a href="{{ url_for('main.product_detail', product_id=product.id) }}" class="btn btn-outline-dark btn-sm w-100 rounded-pill">
+                            자세히 보기 <i class="bi bi-chevron-right text-xs"></i>
+                        </a>
+                    </div>
+                </div>
+            </div>
+            {% else %}
+            <!-- 등록된 상품이 없을 때 표시할 안내 메시지 -->
+            <div class="col-12 text-center py-5">
+                <div class="py-5 text-muted">
+                    <i class="bi bi-bag-x fs-1 d-block mb-3 text-secondary"></i>
+                    <h5>현재 표시할 수 있는 추천 상품이 없습니다.</h5>
+                    <p class="small">상품이 등록되면 이곳에 표시됩니다.</p>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</section>
+
+<!-- ============================================================== -->
+<!-- 4. 룩북 및 브랜드 스토리 섹션 (Lookbook Section)                  -->
+<!-- ============================================================== -->
+<section id="lookbook-section" class="py-5 bg-white">
+    <div class="container py-3">
+        <div class="row align-items-center g-4">
+            <div class="col-lg-6">
+                <!-- picsum.photos 룩북 감성 사진 -->
+                <div class="position-relative">
+                    <img src="https://picsum.photos/seed/vibe_lookbook_mood/750/500" 
+                         alt="VIBE-FASHION 시즌 룩북" 
+                         class="img-fluid rounded-4 shadow-sm w-100 object-fit-cover" 
+                         style="max-height: 400px;">
+                    <div class="position-absolute bottom-0 start-0 m-3 m-md-4 p-3 bg-dark bg-opacity-75 text-white rounded-3 backdrop-blur">
+                        <div class="fw-bold fs-6">2026 Editorial : Everyday Classic</div>
+                        <div class="small text-light text-opacity-75">미니멀하면서도 절제된 실루엣의 완벽한 조화</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-6 ps-lg-5">
+                <span class="text-primary fw-bold small text-uppercase tracking-wider">BRAND PHILOSOPHY</span>
+                <h2 class="display-6 fw-black mb-3">옷을 넘어,<br>당신의 무드를 만듭니다.</h2>
+                <p class="text-secondary leading-relaxed mb-4">
+                    VIBE-FASHION은 과장된 디테일 대신 본질에 집중합니다. 
+                    탄탄한 원단 선택부터 정교한 재단까지, 누구나 입었을 때 가장 자연스럽고 멋스러운 
+                    핏을 완성하기 위해 끊임없이 연구합니다.
+                </p>
+                <div class="row g-3 mb-4">
+                    <div class="col-sm-6">
+                        <div class="p-3 bg-light rounded-3">
+                            <h6 class="fw-bold mb-1"><i class="bi bi-patch-check text-primary me-1"></i> 프리미엄 소재</h6>
+                            <p class="text-muted small mb-0">오래 입어도 형태가 무너지지 않는 고급 원단만을 엄선합니다.</p>
+                        </div>
+                    </div>
+                    <div class="col-sm-6">
+                        <div class="p-3 bg-light rounded-3">
+                            <h6 class="fw-bold mb-1"><i class="bi bi-gem text-primary me-1"></i> 완벽한 핏감</h6>
+                            <p class="text-muted small mb-0">동양인 체형에 가장 이상적인 패턴으로 재단합니다.</p>
+                        </div>
+                    </div>
+                </div>
+                <button type="button" class="btn btn-dark px-4 py-2 rounded-pill fw-medium" onclick="alert('룩북 전체 갤러리가 곧 공개됩니다!')">
+                    브랜드 스토리 더보기 <i class="bi bi-arrow-right ms-1"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ============================================================== -->
+<!-- 5. 뉴스레터 구독 섹션                                            -->
+<!-- ============================================================== -->
+<section class="py-5 bg-dark text-white text-center">
+    <div class="container py-3">
+        <div class="row justify-content-center">
+            <div class="col-lg-6">
+                <i class="bi bi-envelope-paper-heart fs-1 text-warning mb-2 d-inline-block"></i>
+                <h3 class="fw-bold mb-2">VIBE-FASHION 뉴스레터 구독</h3>
+                <p class="text-white-50 small mb-4">
+                    가장 먼저 신상품 발매 소식과 특별 할인 쿠폰을 메일함으로 받아보세요.
+                </p>
+                <form class="row g-2 justify-content-center" onsubmit="event.preventDefault(); alert('구독해주셔서 감사합니다! 웰컴 쿠폰이 발송되었습니다.'); this.reset();">
+                    <div class="col-sm-8">
+                        <input type="email" class="form-control form-control-lg rounded-pill" placeholder="이메일 주소를 입력하세요" required>
+                    </div>
+                    <div class="col-sm-4">
+                        <button type="submit" class="btn btn-warning btn-lg rounded-pill w-100 fw-bold">
+                            구독하기
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}

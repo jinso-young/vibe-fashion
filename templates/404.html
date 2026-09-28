@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+
+{% block title %}페이지를 찾을 수 없습니다 | VIBE-FASHION{% endblock %}
+
+{% block content %}
+<div class="container py-5 text-center my-5">
+    <div class="py-5">
+        <h1 class="display-1 fw-black text-danger">404</h1>
+        <h2 class="fw-bold mb-3">페이지를 찾을 수 없습니다.</h2>
+        <p class="text-secondary mb-4">
+            요청하신 페이지가 삭제되었거나, 주소가 잘못 입력되었을 수 있습니다.<br>
+            아래 버튼을 눌러 메인 화면으로 돌아가세요.
+        </p>
+        <a href="{{ url_for('main.index') }}" class="btn btn-dark btn-lg px-4 py-2 rounded-pill">
+            <i class="bi bi-house-door me-1"></i> 메인 홈으로 가기
+        </a>
+    </div>
+</div>
+{% endblock %}

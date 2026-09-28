@@ -1,0 +1,159 @@
+{% extends "base.html" %}
+
+{% block title %}{{ product.name }} | VIBE-FASHION{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <!-- 네비게이션 경로 (Breadcrumb) -->
+    <nav aria-label="breadcrumb" class="mb-4">
+        <ol class="breadcrumb small">
+            <li class="breadcrumb-item"><a href="{{ url_for('main.index') }}" class="text-decoration-none text-muted">홈</a></li>
+            <li class="breadcrumb-item"><a href="{{ url_for('main.index') }}#products-section" class="text-decoration-none text-muted">{{ product.category }}</a></li>
+            <li class="breadcrumb-item active text-dark fw-medium" aria-current="page">{{ product.name }}</li>
+        </ol>
+    </nav>
+
+    <!-- 상품 상세 정보 영역 -->
+    <div class="row g-5 align-items-start">
+        <!-- 좌측: 상품 이미지 -->
+        <div class="col-lg-6">
+            <div class="position-relative overflow-hidden rounded-4 shadow-sm bg-white">
+                <span class="position-absolute top-0 start-0 m-3 badge bg-{{ product.badge_color }} fs-6 px-3 py-2 shadow-sm" style="z-index: 2;">
+                    {{ product.badge }}
+                </span>
+                <img src="{{ product.image_url }}" alt="{{ product.name }}" class="w-100 object-fit-cover rounded-4" style="max-height: 580px;">
+            </div>
+        </div>
+
+        <!-- 우측: 상품 옵션 및 결제 안내 -->
+        <div class="col-lg-6">
+            <div class="ps-lg-3">
+                <span class="badge bg-light text-secondary border mb-2 text-uppercase">{{ product.category }}</span>
+                <h1 class="fw-black h2 mb-2">{{ product.name }}</h1>
+
+                <!-- 평점 및 리뷰 -->
+                <div class="d-flex align-items-center gap-2 mb-3">
+                    <div class="text-warning">
+                        <i class="bi bi-star-fill"></i>
+                        <i class="bi bi-star-fill"></i>
+                        <i class="bi bi-star-fill"></i>
+                        <i class="bi bi-star-fill"></i>
+                        <i class="bi bi-star-half"></i>
+                    </div>
+                    <span class="fw-bold">{{ product.rating }}</span>
+                    <span class="text-muted small">({{ product.review_count }}개의 구매 리뷰)</span>
+                </div>
+
+                <!-- 가격 영역 -->
+                <div class="p-3 bg-light rounded-3 mb-4">
+                    <div class="d-flex align-items-baseline gap-2 mb-1">
+                        {% if product.discount_rate %}
+                        <span class="text-danger fw-black fs-3">{{ product.discount_rate }}%</span>
+                        <span class="fs-2 fw-black text-dark">{{ product.formatted_price }}</span>
+                        <span class="text-muted text-decoration-line-through">{{ product.formatted_original_price }}</span>
+                        {% else %}
+                        <span class="fs-2 fw-black text-dark">{{ product.formatted_price }}</span>
+                        {% endif %}
+                    </div>
+                    <div class="small text-muted">
+                        <i class="bi bi-truck me-1"></i> 50,000원 이상 결제 시 <strong>무료배송</strong> (오늘 주문 시 내일 도착 예정)
+                    </div>
+                </div>
+
+                <!-- 상품 설명 -->
+                <p class="text-secondary mb-4 leading-relaxed">
+                    {{ product.description }}
+                </p>
+
+                <!-- 옵션 선택 1: 색상 -->
+                <div class="mb-3">
+                    <label class="form-label fw-bold small text-dark">색상 선택</label>
+                    <select class="form-select form-select-lg" id="colorSelect">
+                        {% for color in product.colors %}
+                        <option value="{{ color }}">{{ color }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <!-- 옵션 선택 2: 사이즈 -->
+                <div class="mb-4">
+                    <label class="form-label fw-bold small text-dark">사이즈 선택</label>
+                    <select class="form-select form-select-lg" id="sizeSelect">
+                        <option value="S">S (Small - 95)</option>
+                        <option value="M" selected>M (Medium - 100)</option>
+                        <option value="L">L (Large - 105)</option>
+                        <option value="XL">XL (X-Large - 110)</option>
+                    </select>
+                </div>
+
+                <!-- 수량 선택 -->
+                <div class="mb-4">
+                    <label class="form-label fw-bold small text-dark">구매 수량</label>
+                    <div class="input-group" style="width: 140px;">
+                        <button class="btn btn-outline-secondary" type="button" onclick="changeQuantity(-1)">-</button>
+                        <input type="text" id="quantityInput" class="form-control text-center fw-bold" value="1" readonly>
+                        <button class="btn btn-outline-secondary" type="button" onclick="changeQuantity(1)">+</button>
+                    </div>
+                </div>
+
+                <!-- 구매 버튼 그룹 -->
+                <div class="d-flex gap-2 mb-3">
+                    <button class="btn btn-outline-dark btn-lg flex-grow-1 py-3 fw-bold rounded-pill" onclick="addToCart('{{ product.name }}', {{ product.price }}, '{{ product.thumbnail_url }}')">
+                        <i class="bi bi-bag-plus me-1"></i> 장바구니 담기
+                    </button>
+                    <button class="btn btn-dark btn-lg flex-grow-1 py-3 fw-bold rounded-pill" onclick="alert('결제 단계로 이동합니다 (시뮬레이션)')">
+                        바로 구매하기
+                    </button>
+                    <button class="btn btn-outline-danger btn-lg px-3 rounded-circle" onclick="toggleWishlist(this, '{{ product.name }}')" title="위시리스트 추가">
+                        <i class="bi bi-heart"></i>
+                    </button>
+                </div>
+
+                <!-- 안심 구매 안내 -->
+                <div class="border-top pt-3 text-muted small d-flex flex-column gap-1">
+                    <div><i class="bi bi-check-circle-fill text-success me-1"></i> 안전 결제 시스템 적용 (SSL 256-bit 보안 암호화)</div>
+                    <div><i class="bi bi-arrow-repeat text-primary me-1"></i> 사이즈 및 단순 변심 7일 이내 교환/환불 가능</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 하단 연관 상품 추천 -->
+    {% if related_products %}
+    <div class="mt-5 pt-5 border-top">
+        <h4 class="fw-black mb-4">함께 어울리는 추천 아이템</h4>
+        <div class="row g-4">
+            {% for rel in related_products %}
+            <div class="col-md-4 col-sm-6">
+                <div class="card h-100 border-0 shadow-sm product-card">
+                    <a href="{{ url_for('main.product_detail', product_id=rel.id) }}">
+                        <img src="{{ rel.image_url }}" class="card-img-top" alt="{{ rel.name }}" style="height: 250px; object-fit: cover;">
+                    </a>
+                    <div class="card-body p-3">
+                        <span class="text-muted text-xs text-uppercase">{{ rel.category_name }}</span>
+                        <h6 class="fw-bold mt-1 mb-2">
+                            <a href="{{ url_for('main.product_detail', product_id=rel.id) }}" class="text-dark text-decoration-none">
+                                {{ rel.name }}
+                            </a>
+                        </h6>
+                        <div class="fw-bold">{{ rel.formatted_price }}</div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    function changeQuantity(delta) {
+        const input = document.getElementById('quantityInput');
+        let current = parseInt(input.value) || 1;
+        current = Math.max(1, current + delta);
+        input.value = current;
+    }
+</script>
+{% endblock %}

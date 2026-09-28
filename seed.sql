@@ -1,0 +1,187 @@
+-- ==============================================================================
+-- VIBE-FASHION 쇼핑몰 초기 데이터(Seed) SQL
+-- ==============================================================================
+
+DO $$
+DECLARE
+  -- 카테고리 ID 변수
+  v_cat_top UUID;
+  v_cat_bottom UUID;
+  v_cat_outer UUID;
+  v_cat_dress UUID;
+  v_cat_acc UUID;
+  v_cat_bag UUID;
+  v_cat_shoes UUID;
+
+  -- 상품 ID 변수
+  v_prod_1 UUID;
+  v_prod_2 UUID;
+  v_prod_3 UUID;
+  v_prod_4 UUID;
+BEGIN
+
+  -- ----------------------------------------------------------------------------
+  -- 1. 카테고리 7개 등록 (기존 slug 충돌 시 재사용)
+  -- ----------------------------------------------------------------------------
+  INSERT INTO public.categories (name, slug, description, display_order, is_active)
+  VALUES ('상의', 'top', '티셔츠, 셔츠, 맨투맨, 니트 등', 1, TRUE)
+  ON CONFLICT (slug) DO UPDATE SET name = EXCLUDED.name
+  RETURNING id INTO v_cat_top;
+
+  INSERT INTO public.categories (name, slug, description, display_order, is_active)
+  VALUES ('하의', 'bottom', '데님, 슬랙스, 스커트, 팬츠 등', 2, TRUE)
+  ON CONFLICT (slug) DO UPDATE SET name = EXCLUDED.name
+  RETURNING id INTO v_cat_bottom;
+
+  INSERT INTO public.categories (name, slug, description, display_order, is_active)
+  VALUES ('아우터', 'outer', '자켓, 코트, 패딩, 가디건 등', 3, TRUE)
+  ON CONFLICT (slug) DO UPDATE SET name = EXCLUDED.name
+  RETURNING id INTO v_cat_outer;
+
+  INSERT INTO public.categories (name, slug, description, display_order, is_active)
+  VALUES ('원피스/세트', 'dress', '미니/미디/롱 원피스, 투피스 셋업', 4, TRUE)
+  ON CONFLICT (slug) DO UPDATE SET name = EXCLUDED.name
+  RETURNING id INTO v_cat_dress;
+
+  INSERT INTO public.categories (name, slug, description, display_order, is_active)
+  VALUES ('액세서리', 'acc', '모자, 주얼리, 머플러, 벨트 등', 5, TRUE)
+  ON CONFLICT (slug) DO UPDATE SET name = EXCLUDED.name
+  RETURNING id INTO v_cat_acc;
+
+  INSERT INTO public.categories (name, slug, description, display_order, is_active)
+  VALUES ('가방', 'bag', '숄더백, 토트백, 백팩, 에코백 등', 6, TRUE)
+  ON CONFLICT (slug) DO UPDATE SET name = EXCLUDED.name
+  RETURNING id INTO v_cat_bag;
+
+  INSERT INTO public.categories (name, slug, description, display_order, is_active)
+  VALUES ('신발', 'shoes', '스니커즈, 로퍼, 부츠, 샌들 등', 7, TRUE)
+  ON CONFLICT (slug) DO UPDATE SET name = EXCLUDED.name
+  RETURNING id INTO v_cat_shoes;
+
+  -- ----------------------------------------------------------------------------
+  -- 2. 샘플 상품 4개 등록
+  -- ※ 참고: 일반적인 쇼핑몰 기준 정상가(29,900원) -> 할인가(19,900원) 적용
+  -- ----------------------------------------------------------------------------
+  -- 상품 1: 베이직 크롭 티셔츠 (상의)
+  INSERT INTO public.products (category_id, name, slug, description, price, sale_price, stock, status, is_featured)
+  VALUES (
+    v_cat_top,
+    '베이직 크롭 티셔츠',
+    'basic-crop-tshirt',
+    '데일리하게 착용하기 좋은 코튼 100% 베이직 슬림 크롭 티셔츠입니다.',
+    29900,
+    19900,
+    150,
+    'active',
+    TRUE
+  )
+  ON CONFLICT (slug) DO UPDATE SET
+    price = EXCLUDED.price,
+    sale_price = EXCLUDED.sale_price,
+    stock = EXCLUDED.stock
+  RETURNING id INTO v_prod_1;
+
+  -- 상품 2: 와이드 데님 팬츠 (하의)
+  INSERT INTO public.products (category_id, name, slug, description, price, sale_price, stock, status, is_featured)
+  VALUES (
+    v_cat_bottom,
+    '와이드 데님 팬츠',
+    'wide-denim-pants',
+    '자연스러운 워싱과 트렌디한 와이드 실루엣으로 편안한 착용감을 선사하는 데님 팬츠입니다.',
+    39900,
+    NULL,
+    80,
+    'active',
+    TRUE
+  )
+  ON CONFLICT (slug) DO UPDATE SET
+    price = EXCLUDED.price,
+    sale_price = EXCLUDED.sale_price,
+    stock = EXCLUDED.stock
+  RETURNING id INTO v_prod_2;
+
+  -- 상품 3: 오버핏 코튼 자켓 (아우터)
+  INSERT INTO public.products (category_id, name, slug, description, price, sale_price, stock, status, is_featured)
+  VALUES (
+    v_cat_outer,
+    '오버핏 코튼 자켓',
+    'overfit-cotton-jacket',
+    '간절기 시즌 가볍게 걸치기 좋은 탄탄한 코튼 소재의 미니멀 오버핏 자켓입니다.',
+    59900,
+    NULL,
+    50,
+    'active',
+    TRUE
+  )
+  ON CONFLICT (slug) DO UPDATE SET
+    price = EXCLUDED.price,
+    sale_price = EXCLUDED.sale_price,
+    stock = EXCLUDED.stock
+  RETURNING id INTO v_prod_3;
+
+  -- 상품 4: 플로럴 미디 원피스 (원피스/세트)
+  INSERT INTO public.products (category_id, name, slug, description, price, sale_price, stock, status, is_featured)
+  VALUES (
+    v_cat_dress,
+    '플로럴 미디 원피스',
+    'floral-midi-dress',
+    '로맨틱한 플라워 패턴과 허리 스트링 디테일로 페미닌한 무드를 연출해주는 미디 원피스입니다.',
+    45900,
+    NULL,
+    60,
+    'active',
+    FALSE
+  )
+  ON CONFLICT (slug) DO UPDATE SET
+    price = EXCLUDED.price,
+    sale_price = EXCLUDED.sale_price,
+    stock = EXCLUDED.stock
+  RETURNING id INTO v_prod_4;
+
+  -- ----------------------------------------------------------------------------
+  -- 3. 첫 번째 상품 옵션 9개 (블랙/화이트/베이지 × S/M/L)
+  -- ----------------------------------------------------------------------------
+  -- 기존 옵션 초기화 후 재등록 (중복 방지)
+  DELETE FROM public.product_options WHERE product_id = v_prod_1;
+
+  INSERT INTO public.product_options (product_id, option_name, option_value, additional_price, stock)
+  VALUES
+    -- 블랙 계열 (S, M, L)
+    (v_prod_1, '컬러/사이즈', '블랙 / S', 0, 20),
+    (v_prod_1, '컬러/사이즈', '블랙 / M', 0, 25),
+    (v_prod_1, '컬러/사이즈', '블랙 / L', 0, 15),
+    -- 화이트 계열 (S, M, L)
+    (v_prod_1, '컬러/사이즈', '화이트 / S', 0, 20),
+    (v_prod_1, '컬러/사이즈', '화이트 / M', 0, 25),
+    (v_prod_1, '컬러/사이즈', '화이트 / L', 0, 15),
+    -- 베이지 계열 (S, M, L)
+    (v_prod_1, '컬러/사이즈', '베이지 / S', 0, 10),
+    (v_prod_1, '컬러/사이즈', '베이지 / M', 0, 10),
+    (v_prod_1, '컬러/사이즈', '베이지 / L', 0, 10);
+
+  -- ----------------------------------------------------------------------------
+  -- 4. 상품 썸네일 및 추가 이미지 등록 (picsum.photos 무료 이미지)
+  -- ----------------------------------------------------------------------------
+  -- 기존 이미지 초기화 후 재등록
+  DELETE FROM public.product_images WHERE product_id IN (v_prod_1, v_prod_2, v_prod_3, v_prod_4);
+
+  INSERT INTO public.product_images (product_id, image_url, alt_text, display_order, is_thumbnail)
+  VALUES
+    -- 1번 상품 이미지 (베이직 크롭 티셔츠)
+    (v_prod_1, 'https://picsum.photos/id/1025/600/800', '베이직 크롭 티셔츠 메인 썸네일', 0, TRUE),
+    (v_prod_1, 'https://picsum.photos/id/1062/600/800', '베이직 크롭 티셔츠 디테일 컷 1', 1, FALSE),
+    (v_prod_1, 'https://picsum.photos/id/1069/600/800', '베이직 크롭 티셔츠 디테일 컷 2', 2, FALSE),
+
+    -- 2번 상품 이미지 (와이드 데님 팬츠)
+    (v_prod_2, 'https://picsum.photos/id/1005/600/800', '와이드 데님 팬츠 메인 썸네일', 0, TRUE),
+    (v_prod_2, 'https://picsum.photos/id/1011/600/800', '와이드 데님 팬츠 디테일 컷', 1, FALSE),
+
+    -- 3번 상품 이미지 (오버핏 코튼 자켓)
+    (v_prod_3, 'https://picsum.photos/id/1059/600/800', '오버핏 코튼 자켓 메인 썸네일', 0, TRUE),
+    (v_prod_3, 'https://picsum.photos/id/1060/600/800', '오버핏 코튼 자켓 디테일 컷', 1, FALSE),
+
+    -- 4번 상품 이미지 (플로럴 미디 원피스)
+    (v_prod_4, 'https://picsum.photos/id/1012/600/800', '플로럴 미디 원피스 메인 썸네일', 0, TRUE),
+    (v_prod_4, 'https://picsum.photos/id/1027/600/800', '플로럴 미디 원피스 디테일 컷', 1, FALSE);
+
+END $$;

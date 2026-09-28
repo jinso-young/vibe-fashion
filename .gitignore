@@ -1,0 +1,33 @@
+# ==========================================
+# Git 추적 제외 목록 (.gitignore)
+# ==========================================
+
+# 가상 환경 (Virtual Environments)
+venv/
+.venv/
+env/
+ENV/
+
+# 파이썬 바이트코드 및 캐시 파일
+__pycache__/
+*.py[cod]
+*$py.class
+
+# 환경 변수 및 민감 정보 파일 (보안상 절대 Git에 커밋 금지)
+.env
+.env.local
+
+# 운영체제 생성 파일
+.DS_Store
+Thumbs.db
+
+# VS Code 설정 폴더
+.vscode/
+*.code-workspace
+
+# 로그 파일
+*.log
+
+__pycache__/
+*.pyc
+.DS_Store

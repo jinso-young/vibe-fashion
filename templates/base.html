@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}VIBE-FASHION | 트렌디 패션 쇼핑몰{% endblock %}</title>
+
+    <!-- Bootstrap 5.3 CDN (최신 CSS) -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
+
+    <!-- Bootstrap Icons CDN (아이콘 라이브러리) -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+
+    <!-- Google Fonts (Pretendard 스타일의 깔끔한 Noto Sans KR 폰트) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+
+    <!-- 커스텀 스타일시트 (static/css/style.css) -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+
+    {% block extra_head %}{% endblock %}
+</head>
+<body class="d-flex flex-column min-vh-100 bg-light">
+
+    <!-- ========================================== -->
+    <!-- 글로벌 내비게이션 바 (GNB)                   -->
+    <!-- ========================================== -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark sticky-top shadow-sm py-3">
+        <div class="container">
+            <!-- 브랜드 로고 -->
+            <a class="navbar-brand fw-bold tracking-wider fs-4 text-white" href="{{ url_for('main.index') }}">
+                <i class="bi bi-stars text-warning me-1"></i> VIBE<span class="text-secondary">-</span>FASHION
+            </a>
+
+            <!-- 모바일 토글 버튼 -->
+            <button class="navbar-toggler border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navbarContent" aria-controls="navbarContent" aria-expanded="false" aria-label="메뉴 열기">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+
+            <!-- 메뉴 목록 -->
+            <div class="collapse navbar-collapse" id="navbarContent">
+                <ul class="navbar-nav me-auto mb-2 mb-lg-0 ms-lg-4 fw-medium">
+                    <li class="nav-item">
+                        <a class="nav-link active" href="{{ url_for('main.index') }}">홈</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#products-section">베스트</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#products-section">신상품</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#lookbook-section">룩북</a>
+                    </li>
+                </ul>
+
+                <!-- 우측 사용자 유틸리티 (검색, 찜, 장바구니) -->
+                <div class="d-flex align-items-center gap-3 text-white">
+                    <!-- 검색 버튼 -->
+                    <button class="btn btn-outline-light btn-sm rounded-pill px-3" type="button" data-bs-toggle="modal" data-bs-target="#searchModal">
+                        <i class="bi bi-search me-1"></i> 검색
+                    </button>
+
+                    <!-- 위시리스트 아이콘 -->
+                    <a href="javascript:void(0)" class="text-white text-decoration-none position-relative p-2" title="위시리스트" onclick="alert('위시리스트 기능이 준비 중입니다!')">
+                        <i class="bi bi-heart fs-5"></i>
+                        <span id="wishlist-badge" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" style="display: none;">0</span>
+                    </a>
+
+                    <!-- 장바구니 아이콘 -->
+                    <a href="javascript:void(0)" class="text-white text-decoration-none position-relative p-2" title="장바구니" data-bs-toggle="offcanvas" data-bs-target="#cartOffcanvas">
+                        <i class="bi bi-bag fs-5"></i>
+                        <span id="cart-badge" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-warning text-dark">0</span>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- ========================================== -->
+    <!-- 각 페이지별 본문 컨텐츠 삽입 영역             -->
+    <!-- ========================================== -->
+    <main class="flex-grow-1">
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- ========================================== -->
+    <!-- 푸터 (Footer)                               -->
+    <!-- ========================================== -->
+    <footer class="bg-dark text-white-50 pt-5 pb-4 mt-5 border-top border-secondary border-opacity-25">
+        <div class="container">
+            <div class="row g-4">
+                <!-- 회사 소개 -->
+                <div class="col-lg-4 col-md-6">
+                    <h5 class="text-white fw-bold mb-3">
+                        <i class="bi bi-stars text-warning me-1"></i> VIBE-FASHION
+                    </h5>
+                    <p class="small text-secondary mb-3">
+                        트렌디한 감각과 미니멀한 실루엣의 패션 셀렉트샵.<br>
+                        일상의 모든 순간을 감각적인 무드로 채워드립니다.
+                    </p>
+                    <div class="d-flex gap-3 fs-5 text-white">
+                        <a href="#" class="text-white-50 text-hover-white"><i class="bi bi-instagram"></i></a>
+                        <a href="#" class="text-white-50 text-hover-white"><i class="bi bi-youtube"></i></a>
+                        <a href="#" class="text-white-50 text-hover-white"><i class="bi bi-facebook"></i></a>
+                    </div>
+                </div>
+
+                <!-- 빠른 링크 -->
+                <div class="col-lg-2 col-md-3 col-6">
+                    <h6 class="text-white fw-bold mb-3">카테고리</h6>
+                    <ul class="list-unstyled small text-secondary d-flex flex-column gap-2">
+                        <li><a href="#products-section" class="text-secondary text-decoration-none">아우터 (OUTER)</a></li>
+                        <li><a href="#products-section" class="text-secondary text-decoration-none">상의 (TOP)</a></li>
+                        <li><a href="#products-section" class="text-secondary text-decoration-none">하의 (BOTTOM)</a></li>
+                        <li><a href="#products-section" class="text-secondary text-decoration-none">신발 (SHOES)</a></li>
+                    </ul>
+                </div>
+
+                <!-- 고객 지원 -->
+                <div class="col-lg-2 col-md-3 col-6">
+                    <h6 class="text-white fw-bold mb-3">고객 센터</h6>
+                    <ul class="list-unstyled small text-secondary d-flex flex-column gap-2">
+                        <li><a href="#" class="text-secondary text-decoration-none">공지사항</a></li>
+                        <li><a href="#" class="text-secondary text-decoration-none">배송 & 교환안내</a></li>
+                        <li><a href="#" class="text-secondary text-decoration-none">자주 묻는 질문</a></li>
+                        <li><a href="#" class="text-secondary text-decoration-none">1:1 문의하기</a></li>
+                    </ul>
+                </div>
+
+                <!-- 고객센터 안내 및 정보 -->
+                <div class="col-lg-4 col-md-12">
+                    <h6 class="text-white fw-bold mb-3">고객센터 안내</h6>
+                    <p class="fs-4 fw-bold text-white mb-1">1588-0000</p>
+                    <p class="small text-secondary mb-2">운영시간: 평일 10:00 ~ 18:00 (점심시간 12:30 ~ 13:30)</p>
+                    <p class="small text-secondary mb-0">이메일: support@vibefashion.example.com</p>
+                </div>
+            </div>
+
+            <hr class="border-secondary my-4 opacity-25">
+
+            <div class="d-flex flex-column flex-md-row justify-content-between align-items-center small text-secondary">
+                <p class="mb-2 mb-md-0">&copy; 2026 VIBE-FASHION. All rights reserved.</p>
+                <div class="d-flex gap-3">
+                    <a href="#" class="text-secondary text-decoration-none">이용약관</a>
+                    <a href="#" class="text-secondary text-decoration-none fw-bold">개인정보처리방침</a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- ========================================== -->
+    <!-- 모달: 상품 검색창                           -->
+    <!-- ========================================== -->
+    <div class="modal fade" id="searchModal" tabindex="-1" aria-labelledby="searchModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow">
+                <div class="modal-header border-0 pb-0">
+                    <h5 class="modal-title fw-bold" id="searchModalLabel">상품 검색</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="닫기"></button>
+                </div>
+                <div class="modal-body pt-2">
+                    <div class="input-group mb-3">
+                        <input type="text" id="searchInput" class="form-control form-control-lg" placeholder="검색어를 입력하세요 (예: 블레이저, 후드, 슬랙스)">
+                        <button class="btn btn-dark px-4" type="button" onclick="performSearch()">
+                            <i class="bi bi-search"></i>
+                        </button>
+                    </div>
+                    <div class="small text-muted">
+                        추천 검색어: 
+                        <span class="badge bg-light text-dark border me-1 cursor-pointer" onclick="quickSearch('블레이저')">#블레이저</span>
+                        <span class="badge bg-light text-dark border me-1 cursor-pointer" onclick="quickSearch('슬랙스')">#슬랙스</span>
+                        <span class="badge bg-light text-dark border me-1 cursor-pointer" onclick="quickSearch('후드')">#후드</span>
+                        <span class="badge bg-light text-dark border me-1 cursor-pointer" onclick="quickSearch('부츠')">#부츠</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- 오프캔버스: 장바구니 미리보기 서랍          -->
+    <!-- ========================================== -->
+    <div class="offcanvas offcanvas-end" tabindex="-1" id="cartOffcanvas" aria-labelledby="cartOffcanvasLabel">
+        <div class="offcanvas-header border-bottom">
+            <h5 class="offcanvas-title fw-bold" id="cartOffcanvasLabel">
+                <i class="bi bi-bag-check me-2"></i>내 장바구니
+            </h5>
+            <button type="button" class="btn-close text-reset" data-bs-dismiss="offcanvas" aria-label="닫기"></button>
+        </div>
+        <div class="offcanvas-body d-flex flex-column">
+            <div id="cart-items-container" class="flex-grow-1">
+                <div id="cart-empty-msg" class="text-center py-5 text-muted">
+                    <i class="bi bi-bag-x fs-1 d-block mb-3 opacity-50"></i>
+                    장바구니가 비어 있습니다.
+                </div>
+                <ul id="cart-list" class="list-group list-group-flush"></ul>
+            </div>
+            <div class="border-top pt-3 mt-auto">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <span class="fw-bold">총 결제금액:</span>
+                    <span id="cart-total-price" class="fs-5 fw-bold text-danger">0원</span>
+                </div>
+                <button class="btn btn-dark w-100 py-2 fw-bold" onclick="alert('주문 결제 페이지로 이동합니다 (시뮬레이션)')">
+                    주문하기
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 토스트 알림 (장바구니 담기 성공 알림) -->
+    <div class="toast-container position-fixed bottom-0 end-0 p-3" style="z-index: 1090;">
+        <div id="cartToast" class="toast align-items-center text-bg-dark border-0 shadow" role="alert" aria-live="assertive" aria-atomic="true">
+            <div class="d-flex">
+                <div class="toast-body d-flex align-items-center gap-2">
+                    <i class="bi bi-check-circle-fill text-success fs-5"></i>
+                    <span id="toast-message">상품이 장바구니에 담겼습니다!</span>
+                </div>
+                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap 5.3 CDN (번들 JS) -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
+
+    <!-- 커스텀 자바스크립트 (static/js/main.js) -->
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+
+    {% block extra_js %}{% endblock %}
+</body>
+</html>
