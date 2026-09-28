@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+
+{% block title %}로그인 | VIBE-FASHION{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-md-6 col-lg-5">
+            <div class="card border-0 shadow-sm rounded-4 overflow-hidden">
+                <div class="card-body p-4 p-md-5">
+                    <!-- 헤더 -->
+                    <div class="text-center mb-4">
+                        <span class="badge bg-light text-primary border px-3 py-1 rounded-pill fw-bold mb-2">VIBE-FASHION MEMBER</span>
+                        <h2 class="fw-black mb-1">로그인</h2>
+                        <p class="text-muted small">계정에 로그인하고 나만의 무드를 완성하세요</p>
+                    </div>
+
+                    <!-- 소셜 간편 로그인 (네이버 & 카카오) -->
+                    <div class="d-flex flex-column gap-2 mb-4">
+                        <!-- 카카오 로그인 버튼 (카카오 옐로우 #FEE500) -->
+                        <a href="{{ url_for('auth.social_login', provider='kakao') }}" 
+                           class="btn d-flex align-items-center justify-content-center gap-2 py-2 fw-bold text-dark rounded-pill border-0 shadow-sm"
+                           style="background-color: #FEE500; font-size: 0.95rem;">
+                            <i class="bi bi-chat-fill fs-5" style="color: #381E1F;"></i>
+                            카카오로 3초 만에 시작하기
+                        </a>
+
+                        <!-- 네이버 로그인 버튼 (네이버 그린 #03C75A) -->
+                        <a href="{{ url_for('auth.social_login', provider='naver') }}" 
+                           class="btn d-flex align-items-center justify-content-center gap-2 py-2 fw-bold text-white rounded-pill border-0 shadow-sm"
+                           style="background-color: #03C75A; font-size: 0.95rem;">
+                            <span class="fw-black fs-6" style="font-family: sans-serif;">N</span>
+                            네이버 아이디로 로그인
+                        </a>
+                    </div>
+
+                    <!-- 구분선 -->
+                    <div class="position-relative text-center my-4">
+                        <hr class="text-muted opacity-25">
+                        <span class="position-absolute top-50 start-50 translate-middle bg-white px-3 text-muted text-xs">또는 이메일 로그인</span>
+                    </div>
+
+                    <!-- 일반 이메일 로그인 폼 -->
+                    <form method="POST" action="{{ url_for('auth.login') }}">
+                        <div class="mb-3">
+                            <label for="email" class="form-label small fw-bold">이메일 주소</label>
+                            <input type="email" class="form-control form-control-lg rounded-3 fs-6" id="email" name="email" value="{{ email or '' }}" placeholder="example@email.com" required>
+                        </div>
+                        <div class="mb-3">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <label for="password" class="form-label small fw-bold mb-0">비밀번호</label>
+                                <a href="javascript:void(0)" onclick="alert('가입하신 이메일로 비밀번호 재설정 링크가 전송되었습니다.')" class="text-xs text-muted text-decoration-none">비밀번호 찾기</a>
+                            </div>
+                            <input type="password" class="form-control form-control-lg rounded-3 fs-6 mt-1" id="password" name="password" placeholder="비밀번호를 입력하세요" required>
+                        </div>
+
+                        <div class="form-check mb-4">
+                            <input class="form-check-input" type="checkbox" id="rememberMe" checked>
+                            <label class="form-check-label text-muted small" for="rememberMe">
+                                로그인 상태 유지
+                            </label>
+                        </div>
+
+                        <button type="submit" class="btn btn-dark w-100 py-3 rounded-pill fw-bold shadow-sm">
+                            로그인하기
+                        </button>
+                    </form>
+
+                    <!-- 회원가입 안내 -->
+                    <div class="text-center mt-4 pt-3 border-top">
+                        <span class="text-muted small">아직 VIBE-FASHION 회원이 아니신가요?</span>
+                        <a href="{{ url_for('auth.register') }}" class="fw-bold text-dark ms-1 small text-decoration-none border-bottom border-dark pb-1">
+                            회원가입하기
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

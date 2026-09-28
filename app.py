@@ -56,7 +56,9 @@ def create_app(config_override=None):
     # routes/ 폴더의 라우트 모듈들을 가져와서 앱에 연결합니다.
     # ---------------------------------------------------------
     from routes.main import main_bp
+    from routes.auth import auth_bp
     app.register_blueprint(main_bp)
+    app.register_blueprint(auth_bp)
 
     # 404 에러 핸들러 (사용자가 잘못된 경로로 접근했을 때 친절한 안내)
     @app.errorhandler(404)

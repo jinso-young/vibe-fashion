@@ -55,8 +55,8 @@
                     </li>
                 </ul>
 
-                <!-- 우측 사용자 유틸리티 (검색, 찜, 장바구니) -->
-                <div class="d-flex align-items-center gap-3 text-white">
+                <!-- 우측 사용자 유틸리티 (검색, 위시리스트, 장바구니, 로그인/회원가입/마이페이지) -->
+                <div class="d-flex align-items-center gap-2 gap-md-3 text-white">
                     <!-- 검색 버튼 -->
                     <button class="btn btn-outline-light btn-sm rounded-pill px-3" type="button" data-bs-toggle="modal" data-bs-target="#searchModal">
                         <i class="bi bi-search me-1"></i> 검색
@@ -69,10 +69,34 @@
                     </a>
 
                     <!-- 장바구니 아이콘 -->
-                    <a href="javascript:void(0)" class="text-white text-decoration-none position-relative p-2" title="장바구니" data-bs-toggle="offcanvas" data-bs-target="#cartOffcanvas">
+                    <a href="javascript:void(0)" class="text-white text-decoration-none position-relative p-2 me-1" title="장바구니" data-bs-toggle="offcanvas" data-bs-target="#cartOffcanvas">
                         <i class="bi bi-bag fs-5"></i>
                         <span id="cart-badge" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-warning text-dark">0</span>
                     </a>
+
+                    <!-- 회원 메뉴 (로그인, 회원가입, 마이페이지) -->
+                    <div class="d-flex align-items-center gap-1 border-start border-white border-opacity-25 ps-2 ps-md-3">
+                        {% if session.get('user') %}
+                        <!-- 로그인 상태: 마이페이지 & 로그아웃 -->
+                        <a href="{{ url_for('auth.mypage') }}" class="btn btn-sm btn-outline-light rounded-pill px-3 fw-medium">
+                            <i class="bi bi-person me-1"></i>마이페이지
+                        </a>
+                        <a href="{{ url_for('auth.logout') }}" class="btn btn-sm btn-link text-white text-opacity-75 text-decoration-none px-2 small" title="로그아웃">
+                            로그아웃
+                        </a>
+                        {% else %}
+                        <!-- 비로그인 상태: 로그인, 회원가입, 마이페이지 -->
+                        <a href="{{ url_for('auth.login') }}" class="btn btn-sm btn-link text-white text-decoration-none px-2 fw-medium">
+                            로그인
+                        </a>
+                        <a href="{{ url_for('auth.register') }}" class="btn btn-sm btn-outline-light rounded-pill px-2 px-md-3 fw-medium">
+                            회원가입
+                        </a>
+                        <a href="{{ url_for('auth.mypage') }}" class="btn btn-sm btn-link text-white text-opacity-75 text-decoration-none px-2 small">
+                            마이페이지
+                        </a>
+                        {% endif %}
+                    </div>
                 </div>
             </div>
         </div>
@@ -82,6 +106,20 @@
     <!-- 각 페이지별 본문 컨텐츠 삽입 영역             -->
     <!-- ========================================== -->
     <main class="flex-grow-1">
+        <!-- 플래시 메시지 알림 영역 -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+            <div class="container mt-3">
+                {% for category, message in messages %}
+                <div class="alert alert-{{ category if category != 'error' else 'danger' }} alert-dismissible fade show rounded-3 shadow-sm" role="alert">
+                    <i class="bi bi-info-circle-fill me-2"></i> {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="닫기"></button>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+        {% endwith %}
+
         {% block content %}{% endblock %}
     </main>
 

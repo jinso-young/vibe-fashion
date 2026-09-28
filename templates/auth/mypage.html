@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+
+{% block title %}마이페이지 | VIBE-FASHION{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row g-4 justify-content-center">
+        <!-- 좌측: 회원 프로필 카드 -->
+        <div class="col-lg-4">
+            <div class="card border-0 shadow-sm rounded-4 text-center p-4">
+                <div class="card-body">
+                    <div class="position-relative d-inline-block mb-3">
+                        <div class="rounded-circle bg-dark text-white d-flex align-items-center justify-content-center mx-auto" style="width: 80px; height: 80px; font-size: 2rem;">
+                            {{ user.name[0] if user.name else 'U' }}
+                        </div>
+                        <span class="position-absolute bottom-0 end-0 badge rounded-pill bg-warning text-dark border">
+                            {{ user.grade or 'BRONZE' }}
+                        </span>
+                    </div>
+                    <h4 class="fw-bold mb-1">{{ user.name }}</h4>
+                    <p class="text-muted small mb-3">{{ user.email }}</p>
+
+                    <div class="d-flex justify-content-center gap-2 mb-3">
+                        {% if user.provider == 'naver' %}
+                        <span class="badge" style="background-color: #03C75A; color: white;">네이버 연동회원</span>
+                        {% elif user.provider == 'kakao' %}
+                        <span class="badge" style="background-color: #FEE500; color: #381E1F;">카카오 연동회원</span>
+                        {% else %}
+                        <span class="badge bg-secondary">이메일 회원</span>
+                        {% endif %}
+                    </div>
+
+                    <hr class="my-4 text-muted opacity-25">
+
+                    <!-- 주문 통계 요약 -->
+                    <div class="row text-center g-2">
+                        <div class="col-4">
+                            <div class="fw-bold fs-5 text-dark">0</div>
+                            <div class="text-muted text-xs">주문/배송</div>
+                        </div>
+                        <div class="col-4">
+                            <div class="fw-bold fs-5 text-dark">1</div>
+                            <div class="text-muted text-xs">보유 쿠폰</div>
+                        </div>
+                        <div class="col-4">
+                            <div class="fw-bold fs-5 text-dark">3,000P</div>
+                            <div class="text-muted text-xs">적립금</div>
+                        </div>
+                    </div>
+
+                    <div class="mt-4">
+                        <a href="{{ url_for('auth.logout') }}" class="btn btn-outline-danger btn-sm rounded-pill w-100">
+                            <i class="bi bi-box-arrow-right me-1"></i> 로그아웃
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 우측: 주문 내역 및 혜택 안내 -->
+        <div class="col-lg-7">
+            <!-- 쿠폰 안내 배너 -->
+            <div class="card border-0 shadow-sm rounded-4 p-4 mb-4" style="background: linear-gradient(135deg, #4a2e1b 0%, #2c1a0e 100%); color: white;">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <span class="badge bg-warning text-dark px-2 py-1 mb-2">WELCOME BENEFIT</span>
+                        <h5 class="fw-bold mb-1">신규 가입 15% 즉시할인 쿠폰</h5>
+                        <p class="text-white-50 small mb-0">첫 주문 시 전 상품에 적용 가능합니다.</p>
+                    </div>
+                    <a href="{{ url_for('main.index') }}#products-section" class="btn btn-light btn-sm rounded-pill fw-bold px-3">
+                        쇼핑하기
+                    </a>
+                </div>
+            </div>
+
+            <!-- 최근 주문 내역 -->
+            <div class="card border-0 shadow-sm rounded-4 p-4 mb-4">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5 class="fw-bold mb-0">최근 주문 내역</h5>
+                    <a href="javascript:void(0)" class="text-muted small text-decoration-none">전체보기 <i class="bi bi-chevron-right"></i></a>
+                </div>
+                <div class="text-center py-5 text-muted">
+                    <i class="bi bi-bag-x fs-1 d-block mb-2 opacity-50"></i>
+                    아직 주문 내역이 없습니다.
+                </div>
+            </div>
+
+            <!-- 나의 위시리스트 바로가기 -->
+            <div class="card border-0 shadow-sm rounded-4 p-4">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="fw-bold mb-1"><i class="bi bi-heart-fill text-danger me-2"></i>나의 찜 목록</h6>
+                        <p class="text-muted small mb-0">마음에 담아둔 패션 아이템을 확인해보세요.</p>
+                    </div>
+                    <button type="button" class="btn btn-outline-dark btn-sm rounded-pill px-3" data-bs-toggle="offcanvas" data-bs-target="#wishlistOffcanvas">
+                        위시리스트 열기
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
