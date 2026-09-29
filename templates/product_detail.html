@@ -65,15 +65,18 @@
                     {{ product.description }}
                 </p>
 
-                <!-- 옵션 선택 1: 색상 -->
+                <!-- 색상이 있는 상품만 색상 선택 표시 -->
+                {% if product.colors %}
                 <div class="mb-3">
                     <label class="form-label fw-bold small text-dark">색상 선택</label>
-                    <select class="form-select form-select-lg" id="colorSelect">
+                    <select class="form-select form-select-lg" id="colorSelect" required>
+                        <option value="" selected disabled>색상을 선택하세요</option>
                         {% for color in product.colors %}
                         <option value="{{ color }}">{{ color }}</option>
                         {% endfor %}
                     </select>
                 </div>
+                {% endif %}
 
                 <!-- 옵션 선택 2: 사이즈 -->
                 <div class="mb-4">

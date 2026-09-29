@@ -83,6 +83,13 @@ def format_product(item):
     cat_data = item.get("categories") or {}
     category_slug = (cat_data.get("slug") or "top").upper()
     category_name = cat_data.get("name") or "패션"
+    product_colors = {
+        "basic-crop-tshirt": ["베이지"],
+        "wide-denim-pants": ["청색"],
+        "overfit-cotton-jacket": ["검은색", "갈색"],
+        "modern-daily-hanbok": ["흰색", "분홍"],
+        "classic-stripe-shirt": ["하늘색", "흰색"],
+    }.get(item.get("slug"), [])
 
     return {
         "id": item.get("id"),
@@ -99,6 +106,7 @@ def format_product(item):
         "image_url": thumbnail_url,                   # 템플릿 호환용
         "images": [img.get("image_url") for img in images] if images else [thumbnail_url],
         "options": item.get("product_options") or [],
+        "colors": product_colors,
         "stock": item.get("stock", 0),
         "status": item.get("status", "active"),
         "rating": 4.9,
