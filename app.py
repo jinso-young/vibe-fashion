@@ -16,8 +16,8 @@ import os
 from flask import Flask
 from dotenv import load_dotenv
 
-# .env 파일에서 환경 변수를 자동으로 불러옵니다.
-load_dotenv()
+# .env 파일에서 환경 변수를 자동으로 불러옵니다 (기존 환경변수 override).
+load_dotenv(override=True)
 
 
 def create_app(config_override=None):
