@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+
+{% block title %}회원가입 인증 안내 | VIBE-FASHION{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-md-7 col-lg-6">
+            <div class="card border-0 shadow-sm rounded-4 overflow-hidden text-center p-4 p-md-5">
+                <div class="card-body">
+                    <!-- 아이콘 -->
+                    <div class="mb-4">
+                        <div class="rounded-circle bg-success bg-opacity-10 text-success d-inline-flex align-items-center justify-content-center" style="width: 90px; height: 90px;">
+                            <i class="bi bi-envelope-check-fill fs-1"></i>
+                        </div>
+                    </div>
+
+                    <!-- 헤더 -->
+                    <span class="badge bg-light text-success border border-success border-opacity-25 px-3 py-1 rounded-pill fw-bold mb-2">
+                        EMAIL VERIFICATION
+                    </span>
+                    <h2 class="fw-black mb-3">인증 메일을 보냈습니다</h2>
+                    <p class="text-secondary fs-6 mb-4">
+                        입력하신 이메일 주소로 회원가입 인증 메일이 발송되었습니다.<br>
+                        메일함에서 인증 링크를 클릭하여 가입을 완료해주세요.
+                    </p>
+
+                    <!-- Supabase 무료 티어 이메일 발송 제한 대체 알림 (개발 및 테스트 지원) -->
+                    {% if dev_confirm_url %}
+                    <div class="alert alert-warning border border-warning border-opacity-50 text-start rounded-3 p-3 mb-4 small shadow-sm">
+                        <div class="d-flex align-items-start gap-2">
+                            <i class="bi bi-lightning-charge-fill text-warning fs-5"></i>
+                            <div class="w-100">
+                                <strong class="text-dark">테스트 즉시 인증 지원</strong>
+                                <p class="mb-2 text-muted text-xs">
+                                    Supabase 무료 티어의 기본 이메일 발송 한도(시간당 3~4건)가 초과되었거나 지연될 경우, 아래 버튼을 클릭하여 즉시 이메일 인증을 완료할 수 있습니다.
+                                </p>
+                                <a href="{{ dev_confirm_url }}" class="btn btn-warning btn-sm fw-bold rounded-pill px-3 shadow-sm">
+                                    <i class="bi bi-check2-circle me-1"></i> 이메일 즉시 인증 완료하기
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <!-- 안내 박스 -->
+                    <div class="alert alert-light border text-start rounded-3 p-3 mb-4 small text-muted">
+                        <div class="d-flex align-items-start gap-2 mb-2">
+                            <i class="bi bi-info-circle-fill text-primary mt-1"></i>
+                            <div>
+                                <strong class="text-dark">이메일이 도착하지 않았나요?</strong><br>
+                                스팸 메일함 또는 프로모션 메일함을 확인해주세요. (네이버/다음의 경우 스팸함 분류 주의)
+                            </div>
+                        </div>
+                        <div class="d-flex align-items-start gap-2 mb-2">
+                            <i class="bi bi-clock-history text-secondary mt-1"></i>
+                            <div>
+                                네트워크 환경에 따라 메일 도착까지 1~2분 정도 소요될 수 있습니다.
+                            </div>
+                        </div>
+                        {% if email %}
+                        <div class="d-flex align-items-center justify-content-between pt-2 border-top mt-2">
+                            <span>인증 메일을 다시 받고 싶으신가요?</span>
+                            <form method="POST" action="{{ url_for('auth.resend_confirmation') }}" class="m-0">
+                                <input type="hidden" name="email" value="{{ email }}">
+                                <button type="submit" class="btn btn-outline-primary btn-sm rounded-pill px-3">
+                                    <i class="bi bi-arrow-repeat me-1"></i> 메일 재발송
+                                </button>
+                            </form>
+                        </div>
+                        {% endif %}
+                    </div>
+
+                    <!-- 버튼 액션 -->
+                    <div class="d-flex flex-column flex-sm-row gap-2 justify-content-center">
+                        <a href="{{ url_for('auth.login') }}" class="btn btn-dark py-2 px-4 rounded-pill fw-bold shadow-sm">
+                            <i class="bi bi-box-arrow-in-right me-1"></i> 로그인 페이지로 이동
+                        </a>
+                        <a href="{{ url_for('main.index') }}" class="btn btn-outline-secondary py-2 px-4 rounded-pill fw-medium">
+                            메인 화면으로
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

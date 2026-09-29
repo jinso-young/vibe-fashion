@@ -74,9 +74,12 @@
                     <!-- 회원 메뉴 (로그인, 회원가입, 마이페이지) -->
                     <div class="d-flex align-items-center gap-1 border-start border-white border-opacity-25 ps-2 ps-md-3">
                         {% if session.get('user') %}
-                        <!-- 로그인 상태: 마이페이지 & 로그아웃 -->
-                        <a href="{{ url_for('auth.mypage') }}" class="btn btn-sm btn-outline-light rounded-pill px-3 fw-medium">
-                            <i class="bi bi-person me-1"></i>마이페이지
+                        <!-- 로그인 상태: 사용자명님 안내, 마이페이지, 로그아웃 -->
+                        <span class="text-white text-opacity-90 px-2 fw-medium small">
+                            <i class="bi bi-person-circle me-1 text-warning"></i>{{ session['user'].get('name') or session['user'].get('email', '').split('@')[0] or '고객' }}님
+                        </span>
+                        <a href="{{ url_for('auth.mypage') }}" class="btn btn-sm btn-outline-light rounded-pill px-2 px-md-3 fw-medium">
+                            마이페이지
                         </a>
                         <a href="{{ url_for('auth.logout') }}" class="btn btn-sm btn-link text-white text-opacity-75 text-decoration-none px-2 small" title="로그아웃">
                             로그아웃
@@ -86,7 +89,7 @@
                         <a href="{{ url_for('auth.login') }}" class="btn btn-sm btn-link text-white text-decoration-none px-2 fw-medium">
                             로그인
                         </a>
-                        <a href="{{ url_for('auth.register') }}" class="btn btn-sm btn-outline-light rounded-pill px-2 px-md-3 fw-medium">
+                        <a href="{{ url_for('auth.signup') }}" class="btn btn-sm btn-outline-light rounded-pill px-2 px-md-3 fw-medium">
                             회원가입
                         </a>
                         <a href="{{ url_for('auth.mypage') }}" class="btn btn-sm btn-link text-white text-opacity-75 text-decoration-none px-2 small">
