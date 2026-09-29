@@ -971,42 +971,65 @@ def mypage():
 @auth_bp.route("/delete-account", methods=["GET", "POST"])
 def delete_account():
     """
-    회원 탈퇴 처리 라우트
-    - Supabase Auth 및 profiles 테이블에서 회원 정보를 영구 삭제
-    - 세션 초기화 후 탈퇴 완료 안내 메시지와 함께 로그인 페이지로 이동
+    회원 탈퇴 / 소셜 연동 해제 처리 라우트
+    - 카카오, 네이버, 구글 등 소셜 연동 계정인 경우:
+      기존 이메일 계정(auth.users 및 이메일 profiles)을 삭제하지 않고,
+      해당 소셜 세션 및 소셜 전용 프로필만 정리(연동 해제)합니다.
+    - 일반 이메일 가입 계정인 경우에만:
+      본인 요청 시에만 Auth 및 프로필을 삭제합니다.
     """
-    # 1. user_id 확인 (세션 user_id 또는 session['user']['id'])
+    # 1. user_id 및 provider 확인
     user_id = session.get("user_id")
-    if not user_id:
-        user_obj = session.get("user")
-        if isinstance(user_obj, dict) and user_obj.get("id"):
-            user_id = user_obj["id"]
+    user_obj = session.get("user") or {}
+    if not user_id and isinstance(user_obj, dict) and user_obj.get("id"):
+        user_id = user_obj["id"]
 
     if not user_id:
         return redirect(url_for("auth.login", error="login_required"))
 
+    provider = user_obj.get("provider", "email")
     admin_client = get_supabase_admin_client()
+    supabase = get_supabase_client()
+    db_client = admin_client or supabase
+
     try:
-        # Supabase 관리자 클라이언트로 Auth 및 프로필 삭제
+        # 소셜 연동(카카오, 네이버, 구글 등) 계정의 탈퇴 요청일 경우:
+        # 이메일 원본 계정을 안전하게 보호하고, 소셜 세션 해제 및 해당 소셜 레코드만 안전 정리
+        if provider in ["kakao", "naver", "google"]:
+            logger.info(f"{provider} 소셜 연동 해제 처리 (이메일 원본 계정 보호): user_id={user_id}")
+            if db_client:
+                try:
+                    # 해당 유저가 소셜 전용 ID인 경우에만 profiles 정리 시도
+                    user_email = user_obj.get("email", "")
+                    if f"{provider}_" in user_email or "@kakao.user" in user_email or "@naver.user" in user_email:
+                        db_client.table("profiles").delete().eq("id", user_id).execute()
+                except Exception as pe:
+                    logger.warning(f"소셜 프로필 삭제 경고: {pe}")
+
+            # 세션 데이터만 안전하게 초기화하여 로그아웃 처리
+            session.pop("user_id", None)
+            session.pop("user", None)
+            session.pop("access_token", None)
+            session.pop("refresh_token", None)
+            session.clear()
+            return redirect(url_for("auth.login", success="account_deleted"))
+
+        # [일반 이메일 계정] 본인이 직접 탈퇴를 요청한 경우에만 삭제 진행
         if admin_client:
-            # profiles 테이블에서 명시적 삭제 (DB 제약조건에 따라 CASCADE)
             try:
                 admin_client.table("profiles").delete().eq("id", user_id).execute()
             except Exception as pe:
                 logger.warning(f"profiles 삭제 경고: {pe}")
 
-            # Supabase Auth에서 회원 사용자 완전 삭제 (DB에 없는 모의 계정 예외 무시)
             try:
                 admin_client.auth.admin.delete_user(user_id)
             except Exception as ae:
                 logger.warning(f"auth.admin.delete_user 경고: {ae}")
-        else:
-            supabase = get_supabase_client()
-            if supabase:
-                try:
-                    supabase.table("profiles").delete().eq("id", user_id).execute()
-                except Exception:
-                    pass
+        elif supabase:
+            try:
+                supabase.table("profiles").delete().eq("id", user_id).execute()
+            except Exception:
+                pass
 
         # 세션 데이터 완전 초기화
         session.pop("user_id", None)
