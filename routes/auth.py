@@ -1120,6 +1120,41 @@ def ms_login():
         return redirect(url_for("auth.login", error="social_token_failed"))
 
 
+@auth_bp.route("/auth/google", methods=["GET"])
+@auth_bp.route("/google", methods=["GET"])
+def google_login():
+    """
+    구글 소셜 로그인 라우트 (Supabase OAuth 연동)
+    - supabase.auth.sign_in_with_oauth(provider='google') 호출
+    - redirect_to: SITE_URL + '/auth/callback'
+    """
+    supabase = get_supabase_client()
+    if not supabase:
+        return redirect(url_for("auth.login", error="social_config_missing"))
+
+    redirect_to = f"{get_site_url()}/auth/callback"
+    try:
+        res = supabase.auth.sign_in_with_oauth({
+            "provider": "google",
+            "options": {
+                "redirect_to": redirect_to
+            }
+        })
+        storage = getattr(supabase.auth, "_storage", None)
+        if storage and hasattr(storage, "get_item"):
+            verifier = storage.get_item("supabase.auth.token-code-verifier")
+            if verifier:
+                session["code_verifier"] = verifier
+
+        oauth_url = getattr(res, "url", None) or (res.get("url") if isinstance(res, dict) else None)
+        if oauth_url:
+            return redirect(oauth_url)
+        return redirect(url_for("auth.login", error="social_token_failed"))
+    except Exception as e:
+        logger.error(f"구글 OAuth 요청 실패: {e}")
+        return redirect(url_for("auth.login", error="social_token_failed"))
+
+
 @auth_bp.route("/auth/callback", methods=["GET"])
 @auth_bp.route("/callback", methods=["GET"])
 def auth_callback():
