@@ -623,42 +623,88 @@ def resend_confirmation():
 @auth_bp.route("/auth/confirm", methods=["GET"])
 def confirm():
     """
-    이메일 인증 링크의 토큰을 검증(verify_otp 호출)하고,
+    이메일 인증 링크의 토큰을 검증하고,
     성공 시 Flask session에 저장한 후 /mypage 로 이동합니다.
+    - URL 쿼리 파라미터 (token_hash, access_token) 처리
+    - 브라우저 URL 해시(#access_token=...) 대응 자동 스크립트 제공
     """
     token_hash = request.args.get("token_hash")
     token = request.args.get("token")
     email = request.args.get("email")
     otp_type = request.args.get("type", "signup")
+    access_token = request.args.get("access_token")
+    refresh_token = request.args.get("refresh_token")
 
-    if not token_hash and not token:
-        return redirect(url_for("auth.login", error="invalid_token"))
+    # [1] 쿼리에 토큰 파라미터가 전혀 없는 경우:
+    # Supabase가 해시 프래그먼트(#access_token=...)로 리다이렉트했을 수 있으므로 클라이언트 자바스크립트로 쿼리로 전환
+    if not token_hash and not token and not access_token:
+        return """
+        <!DOCTYPE html>
+        <html>
+        <head><meta charset="utf-8"><title>이메일 인증 처리 중...</title></head>
+        <body>
+        <script>
+            if (window.location.hash) {
+                var hash = window.location.hash.substring(1);
+                var params = new URLSearchParams(hash);
+                var at = params.get('access_token');
+                var rt = params.get('refresh_token');
+                var ty = params.get('type') || 'signup';
+                if (at) {
+                    window.location.href = '/auth/confirm?access_token=' + encodeURIComponent(at) + (rt ? '&refresh_token=' + encodeURIComponent(rt) : '') + '&type=' + encodeURIComponent(ty);
+                } else {
+                    window.location.href = '/auth/login?error=invalid_token';
+                }
+            } else {
+                window.location.href = '/auth/login?error=invalid_token';
+            }
+        </script>
+        <p style="text-align:center; padding: 50px; font-family: sans-serif; color: #555;">이메일 인증을 처리 중입니다. 잠시만 기다려주세요...</p>
+        </body>
+        </html>
+        """
 
     supabase = get_supabase_client()
+    admin_client = get_supabase_admin_client()
     if not supabase:
         return redirect(url_for("auth.login", error="confirm_failed"))
 
-    try:
-        # verify_otp 호출
-        if token_hash:
-            resp = supabase.auth.verify_otp({
-                "token_hash": token_hash,
-                "type": otp_type
-            })
-        elif token and email:
-            resp = supabase.auth.verify_otp({
-                "email": email,
-                "token": token,
-                "type": otp_type
-            })
-        else:
-            resp = supabase.auth.verify_otp({
-                "token_hash": token,
-                "type": otp_type
-            })
+    user = None
+    auth_session = None
 
-        user = resp.user
-        auth_session = resp.session
+    try:
+        # 1. access_token이 직접 전달된 경우
+        if access_token:
+            try:
+                user_res = supabase.auth.get_user(access_token)
+                user = getattr(user_res, "user", None)
+            except Exception as e:
+                logger.warning(f"access_token으로 get_user 실패: {e}")
+
+        # 2. token_hash 검증 (verify_otp)
+        if not user:
+            if token_hash:
+                resp = supabase.auth.verify_otp({
+                    "token_hash": token_hash,
+                    "type": otp_type
+                })
+                user = resp.user
+                auth_session = resp.session
+            elif token and email:
+                resp = supabase.auth.verify_otp({
+                    "email": email,
+                    "token": token,
+                    "type": otp_type
+                })
+                user = resp.user
+                auth_session = resp.session
+            elif token:
+                resp = supabase.auth.verify_otp({
+                    "token_hash": token,
+                    "type": otp_type
+                })
+                user = resp.user
+                auth_session = resp.session
 
         if not user:
             return redirect(url_for("auth.login", error="confirm_failed"))
@@ -669,6 +715,9 @@ def confirm():
             if auth_session and hasattr(auth_session, "access_token"):
                 session["access_token"] = auth_session.access_token
                 session["refresh_token"] = getattr(auth_session, "refresh_token", None)
+            elif access_token:
+                session["access_token"] = access_token
+                session["refresh_token"] = refresh_token
             return redirect(url_for("auth.reset_password"))
 
         # 이메일 인증 완료 사용자 데이터 구성
@@ -695,8 +744,8 @@ def confirm():
                 user_data["grade"] = profile.get("grade", "BRONZE")
                 user_data["role"] = profile.get("role", "customer")
             else:
-                admin_client = get_supabase_admin_client() or supabase
-                admin_client.table("profiles").upsert({
+                db_admin = admin_client or supabase
+                db_admin.table("profiles").upsert({
                     "id": user_id,
                     "email": user_email,
                     "full_name": user_data["name"],
@@ -712,12 +761,18 @@ def confirm():
         if auth_session and hasattr(auth_session, "access_token"):
             session["access_token"] = auth_session.access_token
             session["refresh_token"] = getattr(auth_session, "refresh_token", None)
+        elif access_token:
+            session["access_token"] = access_token
+            session["refresh_token"] = refresh_token
 
         # 성공 시 Flask session 저장 → /mypage
         return redirect(url_for("auth.mypage", success="confirmed"))
 
     except Exception as e:
         logger.error(f"이메일 인증 verify_otp 실패: {e}")
+        # 이미 인증이 완료된 유저인 경우 로그인 페이지로 안내 (이메일 파라미터 보존)
+        if email:
+            return redirect(url_for("auth.login", success="confirmed", email=email))
         return redirect(url_for("auth.login", error="confirm_failed"))
 
 
