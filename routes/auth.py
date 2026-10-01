@@ -1305,9 +1305,16 @@ def auth_callback():
     - 사용자 정보 및 profiles 동기화 후 마이페이지로 이동
     """
     err = request.args.get("error")
+    err_desc = request.args.get("error_description", "")
+    err_code = request.args.get("error_code", "")
     if err:
-        logger.warning(f"OAuth 인증 취소 또는 오류: {err} ({request.args.get('error_description')})")
-        return redirect(url_for("auth.login", error="social_cancelled"))
+        logger.warning(f"OAuth 콜백 error 파라미터 감지: err={err}, code={err_code}, desc={err_desc}")
+        # 카카오 사용자가 직접 취소한 경우(access_denied)에만 social_cancelled로 처리
+        if err == "access_denied" or "cancel" in err_desc.lower():
+            return redirect(url_for("auth.login", error="social_cancelled"))
+        # 서버 오류나 일시적 문제의 경우 토큰 재시도 안내
+        logger.error(f"OAuth 인증 실패: {err} ({err_desc})")
+        return redirect(url_for("auth.login", error="social_token_failed"))
 
     code = request.args.get("code")
     access_token = request.args.get("access_token")
@@ -1362,8 +1369,15 @@ def auth_callback():
                     var params = new URLSearchParams(hash);
                     var access_token = params.get('access_token');
                     var refresh_token = params.get('refresh_token');
+                    var error = params.get('error');
+                    var error_desc = params.get('error_description');
                     if (access_token) {
                         window.location.href = '/auth/callback?access_token=' + encodeURIComponent(access_token) + (refresh_token ? '&refresh_token=' + encodeURIComponent(refresh_token) : '');
+                    } else if (error === 'access_denied') {
+                        window.location.href = '/auth/login?error=social_cancelled';
+                    } else if (error) {
+                        console.error('OAuth hash error:', error, error_desc);
+                        window.location.href = '/auth/login?error=social_token_failed';
                     } else {
                         window.location.href = '/auth/login?error=social_token_failed';
                     }
