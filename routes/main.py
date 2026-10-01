@@ -14,6 +14,9 @@ from flask import Blueprint, render_template, abort, request, jsonify, session, 
 from dotenv import load_dotenv
 from supabase import create_client, Client
 
+# routes.auth에서 admin client 함수 import
+from routes.auth import get_supabase_admin_client
+
 # 로깅 설정
 logger = logging.getLogger(__name__)
 
@@ -315,8 +318,11 @@ def add_to_cart():
             "message": "잘못된 요청입니다."
         }), 400
     
-    # 3. Supabase 클라이언트 초기화
-    supabase = get_supabase_client()
+    # 3. Supabase 클라이언트 초기화 (admin client 우선 사용)
+    supabase = get_supabase_admin_client()
+    if not supabase:
+        supabase = get_supabase_client()
+    
     if not supabase:
         return jsonify({
             "success": False,
