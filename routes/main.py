@@ -9,7 +9,7 @@ Supabase DB와 연동하여 상품 정보를 조회하고 템플릿에 전달합
 import os
 import sys
 import logging
-from flask import Blueprint, render_template, abort, request, jsonify
+from flask import Blueprint, render_template, abort, request, jsonify, session, redirect, url_for
 from dotenv import load_dotenv
 from supabase import create_client, Client
 
@@ -215,7 +215,8 @@ def get_product_sizes(product_id):
     """
     상품 색상별 사이즈 및 재고 목록 조회 API (GET /api/products/<product_id>/sizes?color=<선택한 색상>)
     - product_options 테이블에서 product_id와 color로 필터링
-    - size, stock을 JSON 배열로 반환 (예: [{"size": "S", "stock": 3}, {"size": "M", "stock": 0}])
+    - id(product_option_id), size, stock을 JSON 배열로 반환
+      예: [{"id": "uuid-xxx", "size": "S", "stock": 3}, ...]
     """
     color = request.args.get("color", "").strip()
     if not color:
@@ -227,7 +228,7 @@ def get_product_sizes(product_id):
         if supabase:
             # product_options에서 product_id + color 대소문자 무관(ilike) 필터링
             resp = supabase.table("product_options")\
-                .select("size, stock")\
+                .select("id, size, stock")\
                 .eq("product_id", product_id)\
                 .ilike("color", color)\
                 .not_.is_("size", "null")\
@@ -238,9 +239,10 @@ def get_product_sizes(product_id):
             size_order = {"XS": 1, "S": 2, "M": 3, "L": 4, "XL": 5, "XXL": 6, "FREE": 7}
             raw_list.sort(key=lambda x: size_order.get((x.get("size") or "").upper(), 99))
 
-            # size, stock 형태의 깔끔한 딕셔너리 리스트로 정제
+            # id, size, stock 형태의 깔끔한 딕셔너리 리스트로 정제
             result = [
                 {
+                    "id": item.get("id"),
                     "size": item.get("size"),
                     "stock": int(item.get("stock") or 0)
                 }
@@ -251,3 +253,153 @@ def get_product_sizes(product_id):
         return jsonify([]), 500
 
     return jsonify(result)
+
+
+@main_bp.route("/cart/add", methods=["POST"])
+def add_to_cart():
+    """
+    장바구니 담기 API (POST /cart/add)
+    
+    Request JSON:
+    - product_option_id: 상품 옵션 ID (UUID)
+    - quantity: 수량 (정수, > 0)
+    
+    Response:
+    - 성공 (200): {"success": true, "message": "장바구니에 담겼습니다"}
+    - 재고 부족 (400): {"success": false, "message": "재고가 부족합니다(현재 N개)"}
+    - 기타 에러 (400/500): {"success": false, "message": "에러 메시지"}
+    """
+    # 1. 로그인 체크
+    user_id = session.get("user_id")
+    if not user_id:
+        # session['user'] 딕셔너리에 id가 있는 경우 동기화
+        user_obj = session.get("user")
+        if isinstance(user_obj, dict) and user_obj.get("id"):
+            user_id = user_obj["id"]
+            session["user_id"] = user_id
+        else:
+            return redirect(url_for("auth.login", error="login_required"))
+    
+    # 2. 요청 body에서 product_option_id, quantity 추출
+    try:
+        data = request.get_json() or {}
+        product_option_id = data.get("product_option_id", "").strip()
+        quantity = data.get("quantity")
+        
+        if not product_option_id:
+            return jsonify({
+                "success": False,
+                "message": "product_option_id가 필요합니다."
+            }), 400
+        
+        # quantity를 정수로 변환
+        try:
+            quantity = int(quantity)
+        except (TypeError, ValueError):
+            return jsonify({
+                "success": False,
+                "message": "quantity는 정수여야 합니다."
+            }), 400
+        
+        if quantity <= 0:
+            return jsonify({
+                "success": False,
+                "message": "quantity는 1 이상이어야 합니다."
+            }), 400
+    
+    except Exception as e:
+        print(f"[장바구니 요청 파싱 오류]: {e}", file=sys.stderr)
+        return jsonify({
+            "success": False,
+            "message": "잘못된 요청입니다."
+        }), 400
+    
+    # 3. Supabase 클라이언트 초기화
+    supabase = get_supabase_client()
+    if not supabase:
+        return jsonify({
+            "success": False,
+            "message": "데이터베이스 연결 실패"
+        }), 500
+    
+    try:
+        # 4. product_options 테이블에서 option 조회
+        opt_resp = supabase.table("product_options")\
+            .select("id, product_id, stock")\
+            .eq("id", product_option_id)\
+            .execute()
+        
+        if not opt_resp.data:
+            return jsonify({
+                "success": False,
+                "message": "존재하지 않는 상품 옵션입니다."
+            }), 404
+        
+        option = opt_resp.data[0]
+        product_id = option.get("product_id")
+        current_stock = int(option.get("stock") or 0)
+        
+        # 5. 요청 수량 vs 현재 재고 체크
+        if current_stock < quantity:
+            return jsonify({
+                "success": False,
+                "message": f"재고가 부족합니다(현재 {current_stock}개)"
+            }), 400
+        
+        # 6. carts 테이블에서 동일 옵션이 이미 있는지 확인
+        cart_resp = supabase.table("carts")\
+            .select("id, quantity")\
+            .eq("user_id", user_id)\
+            .eq("option_id", product_option_id)\
+            .execute()
+        
+        # 7. UPSERT 처리: 있으면 UPDATE, 없으면 INSERT
+        if cart_resp.data:
+            # 이미 있는 경우: quantity 누적
+            existing_cart = cart_resp.data[0]
+            cart_id = existing_cart.get("id")
+            existing_qty = int(existing_cart.get("quantity") or 0)
+            new_qty = existing_qty + quantity
+            
+            # 누적 수량이 재고를 초과하는지 확인
+            if new_qty > current_stock:
+                return jsonify({
+                    "success": False,
+                    "message": f"재고가 부족합니다(현재 {current_stock}개)"
+                }), 400
+            
+            # UPDATE
+            update_resp = supabase.table("carts")\
+                .update({"quantity": new_qty})\
+                .eq("id", cart_id)\
+                .execute()
+            
+            if not update_resp.data:
+                raise Exception("UPDATE 실패")
+        
+        else:
+            # 없는 경우: INSERT
+            insert_resp = supabase.table("carts")\
+                .insert({
+                    "user_id": user_id,
+                    "product_id": product_id,
+                    "option_id": product_option_id,
+                    "quantity": quantity
+                })\
+                .execute()
+            
+            if not insert_resp.data:
+                raise Exception("INSERT 실패")
+        
+        # 8. 성공 응답
+        return jsonify({
+            "success": True,
+            "message": "장바구니에 담겼습니다"
+        }), 200
+    
+    except Exception as e:
+        print(f"[장바구니 담기 오류]: {e}", file=sys.stderr)
+        return jsonify({
+            "success": False,
+            "message": "장바구니 추가 중 오류가 발생했습니다."
+        }), 500

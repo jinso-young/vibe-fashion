@@ -198,15 +198,16 @@
 
             let html = '<option value="" selected disabled>사이즈를 선택해주세요</option>';
             sizes.forEach(opt => {
+                const optionId = opt.id;
                 const sizeName = opt.size;
                 const stock = parseInt(opt.stock) || 0;
                 if (stock === 0) {
                     // 재고가 0인 항목: "(품절)" 표시 + disabled 처리
-                    html += `<option value="${sizeName}" data-stock="0" disabled>${sizeName} (품절)</option>`;
+                    html += `<option value="${optionId}" data-stock="0" disabled>${sizeName} (품절)</option>`;
                 } else if (stock === 1) {
-                    html += `<option value="${sizeName}" data-stock="${stock}">${sizeName} (품절 임박 - 1개 남음)</option>`;
+                    html += `<option value="${optionId}" data-stock="${stock}">${sizeName} (품절 임박 - 1개 남음)</option>`;
                 } else {
-                    html += `<option value="${sizeName}" data-stock="${stock}">${sizeName} (재고 ${stock}개)</option>`;
+                    html += `<option value="${optionId}" data-stock="${stock}">${sizeName} (재고 ${stock}개)</option>`;
                 }
             });
 
@@ -286,7 +287,7 @@
         const quantityInput = document.getElementById('quantityInput');
 
         const color = colorSelect ? colorSelect.value : '';
-        const size = sizeSelect ? sizeSelect.value : '';
+        const productOptionId = sizeSelect ? sizeSelect.value : '';
         const qty = parseInt(quantityInput.value) || 1;
 
         if (colorSelect && !color) {
@@ -295,7 +296,7 @@
             return null;
         }
 
-        if (!size) {
+        if (!productOptionId) {
             alert('사이즈를 선택해주세요.');
             sizeSelect.focus();
             return null;
@@ -308,24 +309,46 @@
             return null;
         }
 
-        const optionName = `${color ? color + ' / ' : ''}${size}`;
+        // 사이즈 텍스트 추출 (option의 텍스트에서 " (재고..." 부분 제거)
+        const sizeText = selectedOpt.textContent.split(' (')[0];
+        
         return {
+            productOptionId: productOptionId,
             color: color,
-            size: size,
+            size: sizeText,
             quantity: qty,
-            optionName: optionName,
-            fullName: `${PRODUCT_NAME} (${optionName})`
+            optionName: `${color} / ${sizeText}`
         };
     }
 
-    // 상세 페이지 장바구니 담기
-    function handleDetailAddToCart() {
+    // 상세 페이지 장바구니 담기 (API 호출)
+    async function handleDetailAddToCart() {
         const opt = getSelectedOptionDetails();
         if (!opt) return;
 
-        // 선택한 수량만큼 장바구니에 반영
-        for (let i = 0; i < opt.quantity; i++) {
-            addToCart(opt.fullName, PRODUCT_PRICE, PRODUCT_IMAGE);
+        try {
+            const response = await fetch('/cart/add', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    product_option_id: opt.productOptionId,
+                    quantity: opt.quantity
+                })
+            });
+
+            const data = await response.json();
+
+            if (response.ok && data.success) {
+                alert(data.message);
+                // 성공 시 장바구니 뱃지 업데이트 (필요하면 추가)
+            } else {
+                alert(data.message || '장바구니 추가에 실패했습니다.');
+            }
+        } catch (error) {
+            console.error('장바구니 추가 오류:', error);
+            alert('장바구니 추가 중 오류가 발생했습니다.');
         }
     }
 
