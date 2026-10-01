@@ -1048,45 +1048,23 @@ def delete_account():
     db_client = admin_client or supabase
 
     try:
-        # 소셜 연동(카카오, 네이버, 구글 등) 계정의 탈퇴 요청일 경우:
-        # 이메일 원본 계정을 안전하게 보호하고, 소셜 세션 해제 및 해당 소셜 레코드만 안전 정리
-        if provider in ["kakao", "naver", "google"]:
-            logger.info(f"{provider} 소셜 연동 해제 처리 (이메일 원본 계정 보호): user_id={user_id}")
-            if db_client:
-                try:
-                    # 해당 유저가 소셜 전용 ID인 경우에만 profiles 정리 시도
-                    user_email = user_obj.get("email", "")
-                    if f"{provider}_" in user_email or "@kakao.user" in user_email or "@naver.user" in user_email:
-                        db_client.table("profiles").delete().eq("id", user_id).execute()
-                except Exception as pe:
-                    logger.warning(f"소셜 프로필 삭제 경고: {pe}")
-
-            # 세션 데이터만 안전하게 초기화하여 로그아웃 처리
-            session.pop("user_id", None)
-            session.pop("user", None)
-            session.pop("access_token", None)
-            session.pop("refresh_token", None)
-            session.clear()
-            return redirect(url_for("auth.login", success="account_deleted"))
-
-        # [일반 이메일 계정] 본인이 직접 탈퇴를 요청한 경우에만 삭제 진행
-        if admin_client:
+        # 소셜 연동(카카오, 네이버, 구글) 및 일반 이메일 회원 모두 완전 탈퇴 처리
+        # 1. profiles 및 연관 데이터 정리
+        if db_client:
             try:
-                admin_client.table("profiles").delete().eq("id", user_id).execute()
+                db_client.table("profiles").delete().eq("id", user_id).execute()
             except Exception as pe:
                 logger.warning(f"profiles 삭제 경고: {pe}")
 
+        # 2. Supabase Auth(auth.users) 계정 완전 삭제 (대시보드 Users 목록에서 영구 제거)
+        if admin_client:
             try:
                 admin_client.auth.admin.delete_user(user_id)
+                logger.info(f"Supabase auth.users 삭제 완료: user_id={user_id}, provider={provider}")
             except Exception as ae:
                 logger.warning(f"auth.admin.delete_user 경고: {ae}")
-        elif supabase:
-            try:
-                supabase.table("profiles").delete().eq("id", user_id).execute()
-            except Exception:
-                pass
 
-        # 세션 데이터 완전 초기화
+        # 3. 세션 데이터 완전 초기화
         session.pop("user_id", None)
         session.pop("user", None)
         session.pop("access_token", None)
@@ -1140,10 +1118,15 @@ def kakao_login():
     redirect_to = f"{get_site_url()}/auth/callback"
     try:
         # dict 인자 및 keyword arguments 호환성 처리
+        # scope에 이메일, 닉네임, 프로필 사진을 명시하여 첫 가입 동의창에서 모든 항목을 한번에 받도록 설정
         res = supabase.auth.sign_in_with_oauth({
             "provider": "kakao",
             "options": {
-                "redirect_to": redirect_to
+                "redirect_to": redirect_to,
+                "scopes": "account_email profile_nickname profile_image",
+                "query_params": {
+                    "scope": "account_email,profile_nickname,profile_image"
+                }
             }
         })
 
@@ -1435,10 +1418,12 @@ def social_login(provider):
             logger.warning("KAKAO_CLIENT_ID 환경변수가 설정되지 않았습니다.")
             return redirect(url_for("auth.login", error="social_config_missing"))
 
+        kakao_scope = "account_email,profile_nickname,profile_image"
         auth_url = (
             f"https://kauth.kakao.com/oauth/authorize?response_type=code"
             f"&client_id={kakao_client_id}"
             f"&redirect_uri={urllib.parse.quote(redirect_uri)}"
+            f"&scope={kakao_scope}"
             f"&state={state}"
         )
         return redirect(auth_url)

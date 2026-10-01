@@ -33,6 +33,19 @@ function parsePrice(val) {
  * @param {string} imageUrl 상품 이미지 URL
  */
 function addToCart(name, price, imageUrl) {
+    // 비로그인 상태일 경우 로그인 유도 모달 팝업 표시
+    if (typeof window.IS_LOGGED_IN !== 'undefined' && !window.IS_LOGGED_IN) {
+        const loginModalEl = document.getElementById('loginRequiredModal');
+        if (loginModalEl && typeof bootstrap !== 'undefined') {
+            const loginModal = bootstrap.Modal.getOrCreateInstance(loginModalEl);
+            loginModal.show();
+            return;
+        } else if (confirm('로그인이 필요한 서비스입니다. 로그인 페이지로 이동하시겠습니까?')) {
+            window.location.href = window.LOGIN_URL || '/auth/login';
+            return;
+        }
+    }
+
     const numericPrice = parsePrice(price);
 
     // 상품 객체 추가 (숫자형 가격으로 저장)
@@ -111,6 +124,70 @@ function updateCartUI() {
     list.innerHTML = html;
     // 총합친 가격에 '원'을 딱 하나만 붙임
     totalPriceEl.textContent = total.toLocaleString() + '원';
+}
+
+/**
+ * 장바구니 주문하기 처리 함수
+ */
+function handleCheckout() {
+    // 1. 로그인 여부 확인
+    if (typeof window.IS_LOGGED_IN !== 'undefined' && !window.IS_LOGGED_IN) {
+        const loginModalEl = document.getElementById('loginRequiredModal');
+        if (loginModalEl && typeof bootstrap !== 'undefined') {
+            const loginModal = bootstrap.Modal.getOrCreateInstance(loginModalEl);
+            loginModal.show();
+            return;
+        } else {
+            alert('로그인이 필요한 서비스입니다.');
+            window.location.href = window.LOGIN_URL || '/auth/login';
+            return;
+        }
+    }
+
+    // 2. 장바구니 비어있는지 확인
+    if (!cartState || cartState.length === 0) {
+        alert('장바구니에 담긴 상품이 없습니다.');
+        return;
+    }
+
+    // 3. 총 결제금액 계산
+    let total = 0;
+    cartState.forEach(item => {
+        total += parsePrice(item.price);
+    });
+
+    // 4. 주문 완료 번호 생성 (ORD-YYYYMMDD-랜덤)
+    const now = new Date();
+    const dateStr = now.getFullYear().toString() +
+                    String(now.getMonth() + 1).padStart(2, '0') +
+                    String(now.getDate()).padStart(2, '0');
+    const randomStr = Math.floor(1000 + Math.random() * 9000);
+    const orderNumber = `ORD-${dateStr}-${randomStr}`;
+
+    // 5. 장바구니 오프캔버스 서랍 닫기
+    const offcanvasEl = document.getElementById('cartOffcanvas');
+    if (offcanvasEl && typeof bootstrap !== 'undefined') {
+        const offcanvas = bootstrap.Offcanvas.getInstance(offcanvasEl);
+        if (offcanvas) offcanvas.hide();
+    }
+
+    // 6. 장바구니 비우기 및 UI 갱신
+    cartState.length = 0;
+    updateCartUI();
+
+    // 7. 주문 완료 모달 정보 세팅 및 표시
+    const orderNumEl = document.getElementById('orderSuccessNumber');
+    const orderAmtEl = document.getElementById('orderSuccessAmount');
+    if (orderNumEl) orderNumEl.textContent = orderNumber;
+    if (orderAmtEl) orderAmtEl.textContent = total.toLocaleString() + '원';
+
+    const orderModalEl = document.getElementById('orderSuccessModal');
+    if (orderModalEl && typeof bootstrap !== 'undefined') {
+        const orderModal = bootstrap.Modal.getOrCreateInstance(orderModalEl);
+        orderModal.show();
+    } else {
+        alert(`주문이 정상 접수되었습니다!\n주문번호: ${orderNumber}\n결제금액: ${total.toLocaleString()}원`);
+    }
 }
 
 /**
