@@ -48,6 +48,8 @@ AUTH_MESSAGES = {
     "delete_failed": "회원 탈퇴 처리 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.",
     "login_failed": "로그인 처리 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.",
     "signup_failed": "회원가입 처리 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.",
+    "profile_updated": "회원 정보가 성공적으로 수정되었습니다.",
+    "update_failed": "회원 정보 수정 중 오류가 발생했습니다. 다시 시도해주세요.",
     # 성공 메시지
     "confirmed": "이메일 인증이 성공적으로 완료되었습니다! 환영합니다.",
     "resend_success": "인증 메일이 재발송되었습니다. 메일함을 확인해주세요.",
@@ -1027,55 +1029,108 @@ def reset_password():
 
 
 # =====================================================
-# 마이페이지 및 로그아웃
+# 마이페이지 및 회원 관리
 # =====================================================
-@auth_bp.route("/auth/mypage", methods=["GET"])
-@auth_bp.route("/mypage", methods=["GET"])
+@auth_bp.route("/auth/mypage", methods=["GET", "POST"])
+@auth_bp.route("/mypage", methods=["GET", "POST"])
 @login_required
 def mypage():
-    """마이페이지 라우트 (로그인 필수)"""
-    error_msg, success_msg, error_code, success_code = get_alert_messages()
+    """마이페이지 라우트 (로그인 필수, 프로필 조회 및 정보 수정)"""
     user_id = session.get("user_id")
     user = session.get("user") or {}
+    supabase = get_supabase_client()
+    admin_client = get_supabase_admin_client()
+    client = admin_client or supabase
 
-    # Supabase에서 프로필 최신 정보 조회 및 보완
-    if user_id:
-        supabase = get_supabase_client()
-        admin_client = get_supabase_admin_client()
-        client = admin_client or supabase
-        if client:
+    # [POST] 내 정보 수정 폼 처리
+    if request.method == "POST":
+        full_name = request.form.get("full_name", "").strip()
+        phone = request.form.get("phone", "").strip()
+        address = request.form.get("address", "").strip()
+        address_detail = request.form.get("address_detail", "").strip()
+
+        update_payload = {}
+        if full_name:
+            update_payload["full_name"] = full_name
+        update_payload["phone"] = phone
+
+        # 기본 배송지 주소 합성 (기본주소 + 상세주소)
+        combined_address = f"{address} {address_detail}".strip() if address else ""
+
+        if client and user_id:
             try:
-                # 1. profiles 테이블 조회
-                prof_resp = client.table("profiles").select("*").eq("id", user_id).execute()
-                if not prof_resp.data:
-                    # Supabase에서 삭제된 계정 -> 세션 파기 후 로그인 페이지 이동
-                    logger.info(f"마이페이지 접근 중 삭제된 계정 감지: user_id={user_id} -> 세션 파기")
-                    session.clear()
-                    return redirect(url_for("auth.login", error="login_required"))
-
-                profile = prof_resp.data[0]
-                user["name"] = profile.get("full_name") or user.get("name")
-                user["email"] = profile.get("email") or user.get("email")
-                user["grade"] = profile.get("grade") or user.get("grade", "BRONZE")
-                user["role"] = profile.get("role") or user.get("role", "customer")
-                # 2. profile의 이름이 비어있다면 auth.users 메타데이터 확인
-                if not user.get("name") or user.get("name") == "회원":
-                    if admin_client:
-                        try:
-                            auth_user_resp = admin_client.auth.admin.get_user_by_id(user_id)
-                            if auth_user_resp and auth_user_resp.user:
-                                meta = auth_user_resp.user.user_metadata or {}
-                                full_name = meta.get("full_name") or meta.get("name")
-                                if full_name:
-                                    user["name"] = full_name
-                                    client.table("profiles").update({"full_name": full_name}).eq("id", user_id).execute()
-                        except Exception:
-                            pass
-                if not user.get("name") and user.get("email"):
-                    user["name"] = user["email"].split("@")[0]
+                # profiles 테이블 컬럼 확인 후 안전하게 업데이트
+                client.table("profiles").update(update_payload).eq("id", user_id).execute()
+                
+                # 세션 데이터 동기화
+                if full_name:
+                    user["name"] = full_name
+                user["phone"] = phone
+                user["address"] = address
+                user["address_detail"] = address_detail
                 session["user"] = user
+
+                # auth.users 메타데이터에도 배송지 및 이름 보관
+                if admin_client:
+                    try:
+                        admin_client.auth.admin.update_user_by_id(user_id, {
+                            "user_metadata": {
+                                "full_name": full_name or user.get("name"),
+                                "phone": phone,
+                                "address": address,
+                                "address_detail": address_detail,
+                                "shipping_address": combined_address
+                            }
+                        })
+                    except Exception as me:
+                        logger.warning(f"메타데이터 배송지 저장 경고: {me}")
+
+                return redirect(url_for("auth.mypage", success="profile_updated"))
             except Exception as e:
-                logger.warning(f"마이페이지 프로필 로드 경고: {e}")
+                logger.error(f"프로필 수정 실패: {e}")
+                return redirect(url_for("auth.mypage", error="update_failed"))
+
+    # [GET] Supabase profiles 및 메타데이터에서 최신 정보 조회
+    error_msg, success_msg, error_code, success_code = get_alert_messages()
+
+    if user_id and client:
+        try:
+            # 1. profiles 테이블 조회
+            prof_resp = client.table("profiles").select("*").eq("id", user_id).execute()
+            if not prof_resp.data:
+                logger.info(f"마이페이지 접근 중 삭제된 계정 감지: user_id={user_id} -> 세션 파기")
+                session.clear()
+                return redirect(url_for("auth.login", error="login_required"))
+
+            profile = prof_resp.data[0]
+            user["name"] = profile.get("full_name") or user.get("name")
+            user["email"] = profile.get("email") or user.get("email")
+            user["phone"] = profile.get("phone") or user.get("phone") or ""
+            user["grade"] = profile.get("grade") or user.get("grade", "BRONZE")
+            user["role"] = profile.get("role") or user.get("role", "customer")
+
+            # 2. auth.users 메타데이터에서 기본 배송지 정보 로드
+            if admin_client:
+                try:
+                    auth_user_resp = admin_client.auth.admin.get_user_by_id(user_id)
+                    if auth_user_resp and auth_user_resp.user:
+                        meta = auth_user_resp.user.user_metadata or {}
+                        user["address"] = meta.get("address") or user.get("address") or ""
+                        user["address_detail"] = meta.get("address_detail") or user.get("address_detail") or ""
+                        if not user.get("phone"):
+                            user["phone"] = meta.get("phone") or ""
+                        if not user.get("name") or user.get("name") == "회원":
+                            meta_name = meta.get("full_name") or meta.get("name")
+                            if meta_name:
+                                user["name"] = meta_name
+                except Exception as ae:
+                    logger.warning(f"auth.users 메타데이터 조회 경고: {ae}")
+
+            if not user.get("name") and user.get("email"):
+                user["name"] = user["email"].split("@")[0]
+            session["user"] = user
+        except Exception as e:
+            logger.warning(f"마이페이지 프로필 로드 경고: {e}")
 
     return render_template(
         "auth/mypage.html",
