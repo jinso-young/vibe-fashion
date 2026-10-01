@@ -275,13 +275,19 @@ def add_to_cart():
     """
     # 1. 로그인 체크
     user_id = session.get("user_id")
+    print(f"[Cart] Session user_id: {user_id}", file=sys.stderr)
+    
     if not user_id:
         # session['user'] 딕셔너리에 id가 있는 경우 동기화
         user_obj = session.get("user")
+        print(f"[Cart] Session user obj: {user_obj}", file=sys.stderr)
+        
         if isinstance(user_obj, dict) and user_obj.get("id"):
             user_id = user_obj["id"]
             session["user_id"] = user_id
+            print(f"[Cart] Sync'd user_id: {user_id}", file=sys.stderr)
         else:
+            print(f"[Cart] No user_id found, redirecting to login", file=sys.stderr)
             return redirect(url_for("auth.login", error="login_required"))
     
     # 2. 요청 body에서 product_option_id, quantity 추출
