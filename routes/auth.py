@@ -50,6 +50,9 @@ AUTH_MESSAGES = {
     "signup_failed": "회원가입 처리 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.",
     "profile_updated": "회원 정보가 성공적으로 수정되었습니다.",
     "update_failed": "회원 정보 수정 중 오류가 발생했습니다. 다시 시도해주세요.",
+    "current_password_incorrect": "현재 비밀번호가 일치하지 않습니다.",
+    "password_same_as_old": "새로운 비밀번호가 현재 비밀번호와 동일합니다.",
+    "password_changed": "비밀번호가 변경되었습니다.",
     # 성공 메시지
     "confirmed": "이메일 인증이 성공적으로 완료되었습니다! 환영합니다.",
     "resend_success": "인증 메일이 재발송되었습니다. 메일함을 확인해주세요.",
@@ -1115,6 +1118,8 @@ def mypage():
                     auth_user_resp = admin_client.auth.admin.get_user_by_id(user_id)
                     if auth_user_resp and auth_user_resp.user:
                         meta = auth_user_resp.user.user_metadata or {}
+                        app_meta = getattr(auth_user_resp.user, "app_metadata", {}) or {}
+                        user["provider"] = app_meta.get("provider") or user.get("provider") or "email"
                         user["address"] = meta.get("address") or user.get("address") or ""
                         user["address_detail"] = meta.get("address_detail") or user.get("address_detail") or ""
                         if not user.get("phone"):
@@ -1138,6 +1143,85 @@ def mypage():
         error_message=error_msg,
         success_message=success_msg
     )
+
+
+@auth_bp.route("/mypage/change-password", methods=["POST"])
+@auth_bp.route("/auth/mypage/change-password", methods=["POST"])
+@login_required
+def change_password():
+    """
+    마이페이지 비밀번호 변경 처리 라우트 (POST /mypage/change-password)
+    - 기존 비밀번호 검증 (재로그인 방식)
+    - 새 비밀번호 검증 (최소 6자 이상, 확인 비밀번호 일치)
+    - 새 비밀번호와 기존 비밀번호 동일 여부 검사
+    - Supabase update_user_by_id() 호출
+    """
+    user_id = session.get("user_id")
+    user = session.get("user") or {}
+    email = user.get("email")
+
+    if not user_id:
+        return redirect(url_for("auth.login", error="login_required"))
+
+    # 이메일 주소가 세션에 없다면 DB에서 조회
+    if not email:
+        supabase = get_supabase_client()
+        admin_client = get_supabase_admin_client()
+        client = admin_client or supabase
+        if client:
+            try:
+                prof_resp = client.table("profiles").select("email").eq("id", user_id).execute()
+                if prof_resp.data:
+                    email = prof_resp.data[0].get("email")
+            except Exception:
+                pass
+
+    current_password = request.form.get("current_password", "").strip()
+    new_password = request.form.get("new_password", "").strip()
+    confirm_password = request.form.get("confirm_password", "").strip()
+
+    # 필수값 입력 확인
+    if not current_password or not new_password or not confirm_password:
+        return redirect(url_for("auth.mypage", error="missing_fields"))
+
+    # 1. 기존 비밀번호 검증 (Supabase 재로그인 방식으로 확인)
+    supabase = get_supabase_client()
+    if not supabase or not email:
+        return redirect(url_for("auth.mypage", error="update_failed"))
+
+    try:
+        supabase.auth.sign_in_with_password({
+            "email": email,
+            "password": current_password
+        })
+    except Exception as e:
+        logger.warning(f"현재 비밀번호 불일치: email={email}, err={e}")
+        return redirect(url_for("auth.mypage", error="current_password_incorrect"))
+
+    # 2. 새 비밀번호와 기존 비밀번호 동일 여부 확인
+    if new_password == current_password:
+        return redirect(url_for("auth.mypage", error="password_same_as_old"))
+
+    # 3. 새 비밀번호 유효성 검사 (Day 4 조건: 최소 6자 이상)
+    if len(new_password) < 6:
+        return redirect(url_for("auth.mypage", error="password_too_short"))
+
+    # 4. 새 비밀번호 일치 확인
+    if new_password != confirm_password:
+        return redirect(url_for("auth.mypage", error="password_mismatch"))
+
+    # 5. Supabase update_user_by_id()를 통한 새 비밀번호 반영
+    admin_client = get_supabase_admin_client()
+    if admin_client:
+        try:
+            admin_client.auth.admin.update_user_by_id(user_id, {"password": new_password})
+            logger.info(f"비밀번호 변경 성공: user_id={user_id}")
+            return redirect(url_for("auth.mypage", success="password_changed"))
+        except Exception as ue:
+            logger.error(f"update_user_by_id 실패: {ue}")
+            return redirect(url_for("auth.mypage", error="update_failed"))
+    else:
+        return redirect(url_for("auth.mypage", error="update_failed"))
 
 
 @auth_bp.route("/auth/delete-account", methods=["GET", "POST"])
