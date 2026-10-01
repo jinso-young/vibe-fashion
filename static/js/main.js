@@ -43,9 +43,39 @@ function saveWishlistToStorage() {
     }
 }
 
-const cartState = loadCartFromStorage();
+let cartState = loadCartFromStorage();
 const wishlistState = loadWishlistFromStorage();
 let wishlistCount = wishlistState.length;
+
+async function loadCartFromServer() {
+    if (!window.IS_LOGGED_IN) {
+        updateCartUI();
+        return;
+    }
+
+    try {
+        const response = await fetch('/api/cart', { headers: { 'Accept': 'application/json' } });
+        const data = await response.json();
+        if (!response.ok || !data.success) {
+            throw new Error(data.message || '장바구니를 불러오지 못했습니다.');
+        }
+
+        cartState = (data.items || []).map(item => ({
+            cartId: item.cart_id,
+            name: item.name,
+            price: Number(item.price) || 0,
+            quantity: Number(item.quantity) || 1,
+            imageUrl: item.image_url,
+            color: item.color,
+            size: item.size
+        }));
+        updateCartUI();
+        renderMypageCartSection();
+    } catch (error) {
+        console.error('서버 장바구니 조회 실패:', error);
+        updateCartUI();
+    }
+}
 
 /**
  * 가격 문자열 또는 숫자를 안전하게 정수형 숫자로 변환하는 헬퍼 함수
@@ -106,7 +136,24 @@ function addToCart(name, price, imageUrl) {
  * 장바구니에서 특정 아이템을 제거하는 함수
  * @param {number} index 제거할 아이템의 배열 인덱스
  */
-function removeFromCart(index) {
+async function removeFromCart(index) {
+    const item = cartState[index];
+    if (item && item.cartId) {
+        try {
+            const response = await fetch(`/cart/${encodeURIComponent(item.cartId)}`, { method: 'DELETE' });
+            const data = await response.json();
+            if (!response.ok || !data.success) {
+                alert(data.message || '장바구니에서 삭제하지 못했습니다.');
+                return;
+            }
+            await loadCartFromServer();
+        } catch (error) {
+            console.error('장바구니 삭제 실패:', error);
+            alert('장바구니에서 삭제하지 못했습니다. 다시 시도해주세요.');
+        }
+        return;
+    }
+
     if (index >= 0 && index < cartState.length) {
         cartState.splice(index, 1);
         saveCartToStorage();
@@ -125,7 +172,7 @@ function updateCartUI() {
 
     // 뱃지 숫자 업데이트
     if (badge) {
-        badge.textContent = cartState.length;
+        badge.textContent = cartState.reduce((count, item) => count + (Number(item.quantity) || 1), 0);
     }
 
     // 장바구니 오프캔버스 목록 업데이트
@@ -144,14 +191,17 @@ function updateCartUI() {
 
     cartState.forEach((item, idx) => {
         const itemPrice = parsePrice(item.price);
-        total += itemPrice;
+        const quantity = Number(item.quantity) || 1;
+        const itemTotal = itemPrice * quantity;
+        total += itemTotal;
         html += `
             <li class="list-group-item d-flex align-items-center justify-content-between px-0 py-3">
                 <div class="d-flex align-items-center gap-3">
-                    <img src="${item.imageUrl}" alt="${item.name}" class="rounded" style="width: 50px; height: 50px; object-fit: cover;">
+                    <img src="${item.imageUrl || ''}" alt="${item.name}" class="rounded" style="width: 50px; height: 50px; object-fit: cover;">
                     <div>
                         <div class="fw-bold small text-truncate" style="max-width: 170px;">${item.name}</div>
-                        <div class="text-muted small">${itemPrice.toLocaleString()}원</div>
+                        <div class="text-muted small">${item.color || ''}${item.size ? ` / ${item.size}` : ''}${quantity > 1 ? ` · ${quantity}개` : ''}</div>
+                        <div class="text-muted small">${itemTotal.toLocaleString()}원</div>
                     </div>
                 </div>
                 <button type="button" class="btn btn-sm btn-outline-danger border-0" onclick="removeFromCart(${idx})" title="삭제">
@@ -247,13 +297,14 @@ function openCheckoutModalWithItems(items, isSingle) {
     let html = '';
 
     items.forEach(item => {
-        const p = parsePrice(item.price);
+        const quantity = Number(item.quantity) || 1;
+        const p = parsePrice(item.price) * quantity;
         total += p;
         html += `
             <div class="d-flex align-items-center justify-content-between py-2 border-bottom">
                 <div class="d-flex align-items-center gap-2">
                     <img src="${item.imageUrl}" alt="${item.name}" class="rounded" style="width: 40px; height: 40px; object-fit: cover;">
-                    <span class="small fw-medium text-truncate" style="max-width: 140px;">${item.name}</span>
+                    <span class="small fw-medium text-truncate" style="max-width: 140px;">${item.name}${quantity > 1 ? ` (${quantity}개)` : ''}</span>
                 </div>
                 <span class="small fw-bold">${p.toLocaleString()}원</span>
             </div>
@@ -296,7 +347,7 @@ function processPayment() {
 
     let total = 0;
     currentCheckoutItems.forEach(item => {
-        total += parsePrice(item.price);
+        total += parsePrice(item.price) * (Number(item.quantity) || 1);
     });
 
     // 주문 번호 생성 (ORD-YYYYMMDD-랜덤)
@@ -462,9 +513,9 @@ function updateWishlistUI() {
                     </div>
                 </div>
                 <div class="d-flex align-items-center gap-1">
-                    <button type="button" class="btn btn-sm btn-outline-dark" onclick="addToCart('${item.name}', ${itemPrice}, '${item.imageUrl}')" title="장바구니 담기">
+                    <a href="${item.detailUrl}" class="btn btn-sm btn-outline-dark" title="옵션 선택">
                         <i class="bi bi-bag-plus"></i>
-                    </button>
+                    </a>
                     <button type="button" class="btn btn-sm btn-outline-danger border-0" onclick="removeFromWishlist(${idx})" title="삭제">
                         <i class="bi bi-trash"></i>
                     </button>
@@ -576,9 +627,9 @@ function quickSearch(tag) {
 /**
  * 페이지 로드 시 장바구니 및 위시리스트 상태 초기화
  */
-document.addEventListener('DOMContentLoaded', () => {
-    updateCartUI();
+document.addEventListener('DOMContentLoaded', async () => {
     updateWishlistUI();
+    await loadCartFromServer();
     renderMypageCartSection();
 });
 
@@ -594,7 +645,7 @@ function renderMypageCartSection() {
     if (!container) return;
 
     if (countBadge) {
-        countBadge.textContent = cartState.length;
+        countBadge.textContent = cartState.reduce((count, item) => count + (Number(item.quantity) || 1), 0);
     }
 
     if (!cartState || cartState.length === 0) {
@@ -611,14 +662,17 @@ function renderMypageCartSection() {
 
     cartState.forEach((item, idx) => {
         const itemPrice = parsePrice(item.price);
-        total += itemPrice;
+        const quantity = Number(item.quantity) || 1;
+        const itemTotal = itemPrice * quantity;
+        total += itemTotal;
         html += `
             <div class="d-flex align-items-center justify-content-between p-3 border rounded-3 mb-2 bg-white shadow-xs">
                 <div class="d-flex align-items-center gap-3">
-                    <img src="${item.imageUrl}" alt="${item.name}" class="rounded-3" style="width: 55px; height: 55px; object-fit: cover;">
+                    <img src="${item.imageUrl || ''}" alt="${item.name}" class="rounded-3" style="width: 55px; height: 55px; object-fit: cover;">
                     <div>
                         <div class="fw-bold small text-dark">${item.name}</div>
-                        <div class="text-danger fw-bold small">${itemPrice.toLocaleString()}원</div>
+                        <div class="text-muted text-xs">${item.color || ''}${item.size ? ` / ${item.size}` : ''}${quantity > 1 ? ` (${quantity}개)` : ''}</div>
+                        <div class="text-danger fw-bold small">${itemTotal.toLocaleString()}원</div>
                     </div>
                 </div>
                 <div class="d-flex align-items-center gap-2">

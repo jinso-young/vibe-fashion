@@ -249,6 +249,11 @@ def validate_session_user():
     if request.endpoint and (request.endpoint.startswith("static") or request.endpoint in ["auth.logout", "auth.delete_account"]):
         return
     user_id = session.get("user_id")
+    if not user_id:
+        session_user = session.get("user")
+        user_id = session_user.get("id") if isinstance(session_user, dict) else None
+        if user_id:
+            session["user_id"] = user_id
     if user_id:
         supabase = get_supabase_client()
         admin_client = get_supabase_admin_client()
@@ -1141,9 +1146,10 @@ def mypage():
     cart_items = []
     cart_total = 0
     try:
-        if supabase and user_id:
-            cart_resp = supabase.table("carts")\
-                .select("id, product_id, option_id, quantity, products(id, name, price, thumbnail_url), product_options(id, color, size, stock)")\
+        cart_client = admin_client or supabase
+        if cart_client and user_id:
+            cart_resp = cart_client.table("carts")\
+                .select("id, product_id, option_id, quantity, products(id, name, price, sale_price, product_images(image_url, is_thumbnail, display_order)), product_options(id, option_name, option_value)")\
                 .eq("user_id", user_id)\
                 .execute()
             
@@ -1151,8 +1157,24 @@ def mypage():
                 for cart in cart_resp.data:
                     product = cart.get("products") or {}
                     option = cart.get("product_options") or {}
+                    option_name = str(option.get("option_name") or "").casefold()
+                    option_value = str(option.get("option_value") or "").strip()
+                    color = ""
+                    size = ""
+                    if "/" in option_value and ("size" in option_name or "사이즈" in option_name):
+                        color, size = (part.strip() for part in option_value.split("/", 1))
+                    elif "size" in option_name or "사이즈" in option_name:
+                        size = option_value
+                    else:
+                        color = option_value
                     quantity = int(cart.get("quantity") or 1)
-                    product_price = int(product.get("price") or 0)
+                    base_price = int(product.get("price") or 0)
+                    sale_price = int(product.get("sale_price") or 0)
+                    product_price = sale_price if 0 < sale_price < base_price else base_price
+                    images = product.get("product_images") or []
+                    thumbnail = next((image.get("image_url") for image in images if image.get("is_thumbnail")), None)
+                    if not thumbnail and images:
+                        thumbnail = images[0].get("image_url")
                     item_total = product_price * quantity
                     cart_total += item_total
                     
@@ -1161,14 +1183,14 @@ def mypage():
                         "product_id": product.get("id"),
                         "option_id": option.get("id"),
                         "product_name": product.get("name"),
-                        "color": option.get("color"),
-                        "size": option.get("size"),
+                        "color": color,
+                        "size": size,
                         "price": product_price,
                         "quantity": quantity,
                         "item_total": item_total,
                         "formatted_price": f"{product_price:,}원",
                         "formatted_item_total": f"{item_total:,}원",
-                        "thumbnail_url": product.get("thumbnail_url") or f"https://picsum.photos/seed/{product.get('id', 'item')}/200/200"
+                        "thumbnail_url": thumbnail or f"https://picsum.photos/seed/{product.get('id', 'item')}/200/200"
                     })
     except Exception as e:
         logger.warning(f"마이페이지 장바구니 조회 경고: {e}")

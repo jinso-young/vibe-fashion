@@ -156,13 +156,12 @@
                                  loading="lazy">
                         </a>
 
-                        <!-- 빠른 장바구니 담기 오버레이 버튼 -->
+                        <!-- 옵션 선택 후 장바구니에 담기 -->
                         <div class="quick-action-overlay">
-                            <button type="button" 
-                                    class="btn btn-dark btn-sm w-100 rounded-0 py-2 shadow fw-medium"
-                                    onclick="addToCart('{{ product.name }}', {{ product.price }}, '{{ product.thumbnail_url }}')">
-                                <i class="bi bi-bag-plus me-1"></i> 장바구니 담기
-                            </button>
+                            <a href="{{ url_for('main.product_detail', product_id=product.id) }}"
+                               class="btn btn-dark btn-sm w-100 rounded-0 py-2 shadow fw-medium">
+                                <i class="bi bi-bag-plus me-1"></i> 옵션 선택
+                            </a>
                         </div>
                     </div>
 

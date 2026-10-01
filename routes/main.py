@@ -118,6 +118,25 @@ def format_product(item):
     }
 
 
+def parse_product_option(option):
+    option_name = str(option.get("option_name") or "").casefold()
+    option_value = str(option.get("option_value") or "").strip()
+    color = str(option.get("color") or "").strip()
+    size = str(option.get("size") or "").strip()
+
+    if "/" in option_value and ("size" in option_name or "사이즈" in option_name):
+        value_color, value_size = (part.strip() for part in option_value.split("/", 1))
+        color = color or value_color
+        size = size or value_size
+    elif not color and not size:
+        if "size" in option_name or "사이즈" in option_name:
+            size = option_value
+        else:
+            color = option_value
+
+    return color, size
+
+
 @main_bp.route("/")
 def index():
     """
@@ -184,12 +203,24 @@ def product_detail(product_id):
             if resp.data:
                 product = format_product(resp.data[0])
 
-            # 2. product_options 테이블에서 색상(color) 목록 DISTINCT 조회
-            opt_resp = supabase.table("product_options").select("color").eq("product_id", product_id).not_.is_("color", "null").execute()
-            if opt_resp.data:
-                raw_colors = [row.get("color") for row in opt_resp.data if row.get("color")]
-                # 중복 제거 및 정렬
-                available_colors = sorted(list(dict.fromkeys(raw_colors)))
+            # 2. 옵션 컬럼과 기존 option_value 형식 모두에서 색상 목록 구성
+            try:
+                opt_resp = supabase.table("product_options")\
+                    .select("color, option_name, option_value")\
+                    .eq("product_id", product_id)\
+                    .execute()
+            except Exception:
+                opt_resp = supabase.table("product_options")\
+                    .select("option_name, option_value")\
+                    .eq("product_id", product_id)\
+                    .execute()
+            options = opt_resp.data or []
+            explicit_colors = [str(row.get("color")).strip() for row in options if row.get("color")]
+            if explicit_colors:
+                available_colors = sorted(set(explicit_colors), key=str.casefold)
+            else:
+                parsed_colors = [parse_product_option(row)[0] for row in options]
+                available_colors = sorted(set(filter(None, parsed_colors)), key=str.casefold)
 
             # 3. 연관 추천 상품 (현재 상품 제외 최대 3개)
             rel_resp = supabase.table("products").select("*, product_images(*), categories(*)").neq("id", product_id).limit(3).execute()
@@ -230,15 +261,27 @@ def get_product_sizes(product_id):
     try:
         supabase = get_supabase_client()
         if supabase:
-            # product_options에서 product_id + color 대소문자 무관(ilike) 필터링
-            resp = supabase.table("product_options")\
-                .select("id, size, stock")\
-                .eq("product_id", product_id)\
-                .ilike("color", color)\
-                .not_.is_("size", "null")\
-                .execute()
+            # 실제 DB의 option_value와 color/size 컬럼을 함께 지원
+            try:
+                resp = supabase.table("product_options")\
+                    .select("id, option_name, option_value, color, size, stock")\
+                    .eq("product_id", product_id)\
+                    .execute()
+            except Exception:
+                resp = supabase.table("product_options")\
+                    .select("id, option_name, option_value, stock")\
+                    .eq("product_id", product_id)\
+                    .execute()
 
-            raw_list = resp.data or []
+            raw_list = []
+            for item in resp.data or []:
+                option_color, option_size = parse_product_option(item)
+                if option_color.casefold() == color.casefold() and option_size:
+                    raw_list.append({
+                        "id": item.get("id"),
+                        "size": option_size,
+                        "stock": item.get("stock")
+                    })
             # 사이즈 순서 정렬 (XS -> S -> M -> L -> XL -> XXL -> FREE)
             size_order = {"XS": 1, "S": 2, "M": 3, "L": 4, "XL": 5, "XXL": 6, "FREE": 7}
             raw_list.sort(key=lambda x: size_order.get((x.get("size") or "").upper(), 99))
@@ -287,8 +330,11 @@ def add_to_cart():
             session["user_id"] = user_id
             print(f"[Cart] Sync'd user_id: {user_id}", file=sys.stderr)
         else:
-            print(f"[Cart] No user_id found, redirecting to login", file=sys.stderr)
-            return redirect(url_for("auth.login", error="login_required"))
+            print(f"[Cart] No user_id found, login required", file=sys.stderr)
+            return jsonify({
+                "success": False,
+                "message": "로그인이 필요합니다. 다시 로그인해주세요."
+            }), 401
     
     # 2. 요청 body에서 product_option_id, quantity 추출
     try:
@@ -420,69 +466,187 @@ def add_to_cart():
         }), 500
 
 
+@main_bp.route("/api/cart", methods=["GET"])
+def get_cart_items():
+    """현재 로그인 사용자의 DB 장바구니를 JSON으로 반환합니다."""
+    user_id = session.get("user_id")
+    if not user_id:
+        user = session.get("user")
+        user_id = user.get("id") if isinstance(user, dict) else None
+    if not user_id:
+        return jsonify({"success": False, "message": "로그인이 필요합니다."}), 401
+
+    supabase = get_supabase_admin_client() or get_supabase_client()
+    if not supabase:
+        return jsonify({"success": False, "message": "데이터베이스 연결에 실패했습니다."}), 500
+
+    try:
+        response = supabase.table("carts")\
+            .select("id, quantity, products(id, name, price, sale_price, status, product_images(image_url, is_thumbnail, display_order)), product_options(id, option_name, option_value, stock)")\
+            .eq("user_id", user_id)\
+            .execute()
+
+        items = []
+        for cart in response.data or []:
+            product = cart.get("products") or {}
+            option = cart.get("product_options") or {}
+            formatted_product = format_product(product)
+            color, size = parse_product_option(option)
+            quantity = int(cart.get("quantity") or 1)
+            price = int(formatted_product.get("price") or 0)
+            stock = int(option.get("stock") or 0) if option else 0
+            is_sold_out = (stock <= 0) or (product.get("status") == "sold_out")
+            items.append({
+                "cart_id": cart.get("id"),
+                "name": formatted_product.get("name") or "상품",
+                "price": price,
+                "quantity": quantity,
+                "stock": stock,
+                "is_sold_out": is_sold_out,
+                "subtotal": price * quantity,
+                "image_url": formatted_product.get("thumbnail_url") or "",
+                "color": color,
+                "size": size
+            })
+        return jsonify({"success": True, "items": items})
+    except Exception as e:
+        logger.exception("장바구니 API 조회 실패")
+        return jsonify({"success": False, "message": "장바구니를 불러오지 못했습니다."}), 500
+
+
 @main_bp.route("/cart")
 def view_cart():
     """
     장바구니 조회 페이지 (GET /cart)
-    - 로그인 필수
-    - 사용자의 carts 테이블 데이터를 조회하여 표시
-    - 상품명, 가격, 이미지, 수량, 합계 표시
+    - carts + product_options + products JOIN 조회
+    - 각 아이템: 상품명, 색상, 사이즈, 수량, 단가, 소계
+    - 품절(stock=0) 아이템은 "품절됨" 배지 + 수량 변경 비활성화
+    - 전체 합계 + 배송비 (50,000원 미만 3,000원, 이상 무료)
+    - "주문하기" 버튼 -> /order/checkout (품절 상품 포함 시 비활성화 + 안내 문구)
     """
     user_id = session.get("user_id")
     if not user_id:
         user_obj = session.get("user")
         if isinstance(user_obj, dict) and user_obj.get("id"):
             user_id = user_obj["id"]
+            session["user_id"] = user_id
         else:
             return redirect(url_for("auth.login", error="login_required"))
-    
+
+    error_msg = None
+    if request.args.get("error") == "sold_out_included":
+        error_msg = "품절된 상품이 포함되어 있어 주문할 수 없습니다. 품절 상품을 삭제해 주세요."
+
     cart_items = []
     total_price = 0
-    
+
     try:
-        supabase = get_supabase_client()
+        supabase = get_supabase_admin_client() or get_supabase_client()
         if supabase:
-            # carts 테이블에서 해당 사용자의 장바구니 조회
-            # product, product_options 정보도 함께 조회
+            # carts + products + product_options JOIN 조회
             cart_resp = supabase.table("carts")\
-                .select("id, product_id, option_id, quantity, products(id, name, price, thumbnail_url), product_options(id, color, size, stock)")\
+                .select("id, product_id, option_id, quantity, products(id, name, price, sale_price, status, product_images(image_url, is_thumbnail, display_order)), product_options(id, option_name, option_value, stock)")\
                 .eq("user_id", user_id)\
                 .execute()
-            
+
             if cart_resp.data:
                 for cart in cart_resp.data:
                     product = cart.get("products") or {}
                     option = cart.get("product_options") or {}
+                    formatted_product = format_product(product)
+                    color, size = parse_product_option(option)
                     quantity = int(cart.get("quantity") or 1)
-                    product_price = int(product.get("price") or 0)
+                    product_price = int(formatted_product.get("price") or 0)
                     item_total = product_price * quantity
                     total_price += item_total
-                    
+
+                    stock = int(option.get("stock") or 0) if option else 0
+                    is_sold_out = (stock <= 0) or (product.get("status") == "sold_out")
+
                     cart_items.append({
                         "cart_id": cart.get("id"),
                         "product_id": product.get("id"),
-                        "option_id": option.get("id"),
-                        "product_name": product.get("name"),
-                        "color": option.get("color"),
-                        "size": option.get("size"),
+                        "option_id": option.get("id") if option else None,
+                        "product_name": formatted_product.get("name"),
+                        "color": color,
+                        "size": size,
                         "price": product_price,
                         "quantity": quantity,
+                        "stock": stock,
+                        "is_sold_out": is_sold_out,
                         "item_total": item_total,
                         "formatted_price": f"{product_price:,}원",
                         "formatted_item_total": f"{item_total:,}원",
-                        "thumbnail_url": product.get("thumbnail_url") or f"https://picsum.photos/seed/{product.get('id', 'item')}/200/200"
+                        "thumbnail_url": formatted_product.get("thumbnail_url") or f"https://picsum.photos/seed/{product.get('id', 'item')}/200/200"
                     })
-    
     except Exception as e:
         print(f"[장바구니 조회 오류]: {e}", file=sys.stderr)
-    
+
+    has_sold_out_items = any(item.get("is_sold_out") for item in cart_items)
+
+    # 전체 합계 + 배송비 (50,000원 미만이면 3,000원, 이상이면 무료)
+    if not cart_items or total_price == 0:
+        shipping_fee = 0
+    elif total_price < 50000:
+        shipping_fee = 3000
+    else:
+        shipping_fee = 0
+
+    final_total = total_price + shipping_fee
+
     return render_template(
         "cart.html",
         cart_items=cart_items,
         total_price=total_price,
-        formatted_total=f"{total_price:,}원" if total_price > 0 else "0원",
+        shipping_fee=shipping_fee,
+        final_total=final_total,
+        formatted_total=f"{total_price:,}원",
+        formatted_shipping_fee="무료" if shipping_fee == 0 else f"{shipping_fee:,}원",
+        formatted_final_total=f"{final_total:,}원",
+        has_sold_out_items=has_sold_out_items,
+        error_message=error_msg,
         brand_name="VIBE-FASHION"
     )
+
+
+@main_bp.route("/order/checkout")
+def order_checkout():
+    """
+    주문/결제 진행 라우트 (GET /order/checkout)
+    - 로그인 필수
+    - 단, 품절 아이템이 하나라도 있으면 주문 불가 -> /cart?error=sold_out_included 리다이렉트
+    - 정상 시 장바구니 결제 모달 오픈 파라미터와 함께 이동
+    """
+    user_id = session.get("user_id")
+    if not user_id:
+        user_obj = session.get("user")
+        if isinstance(user_obj, dict) and user_obj.get("id"):
+            user_id = user_obj["id"]
+            session["user_id"] = user_id
+        else:
+            return redirect(url_for("auth.login", error="login_required"))
+
+    supabase = get_supabase_admin_client() or get_supabase_client()
+    if supabase:
+        try:
+            cart_resp = supabase.table("carts")\
+                .select("id, quantity, product_options(stock), products(status)")\
+                .eq("user_id", user_id)\
+                .execute()
+            items = cart_resp.data or []
+            if not items:
+                return redirect(url_for("main.view_cart"))
+
+            for cart in items:
+                opt = cart.get("product_options") or {}
+                prod = cart.get("products") or {}
+                stock = int(opt.get("stock") or 0)
+                if stock <= 0 or prod.get("status") == "sold_out":
+                    return redirect(url_for("main.view_cart", error="sold_out_included"))
+        except Exception as e:
+            logger.warning(f"체크아웃 전 카트 확인 오류: {e}")
+
+    return redirect(url_for("main.view_cart", checkout="1"))
 
 
 @main_bp.route("/cart/<cart_id>", methods=["PATCH"])
@@ -561,7 +725,7 @@ def update_cart_quantity(cart_id):
         cart = cart_resp.data[0]
         
         # 5. 본인 소유 확인 (보안: 다른 사용자의 cart 접근 차단)
-        if cart.get("user_id") != user_id:
+        if str(cart.get("user_id")) != str(user_id):
             return jsonify({
                 "success": False,
                 "message": "이 장바구니 항목에 접근할 권한이 없습니다"
@@ -601,15 +765,18 @@ def update_cart_quantity(cart_id):
         if not update_resp.data:
             raise Exception("UPDATE 실패")
         
-        # 9. 새 소계(subtotal) 계산
+        # 9. 새 소계(subtotal) 계산 (할인가 반영)
         prod_resp = supabase.table("products")\
-            .select("price")\
+            .select("price, sale_price")\
             .eq("id", product_id)\
             .execute()
         
         product_price = 0
         if prod_resp.data:
-            product_price = int(prod_resp.data[0].get("price") or 0)
+            prod_data = prod_resp.data[0]
+            base_price = int(prod_data.get("price") or 0)
+            sale_price = int(prod_data.get("sale_price") or 0)
+            product_price = sale_price if 0 < sale_price < base_price else base_price
         
         subtotal = product_price * quantity
         
@@ -677,8 +844,8 @@ def remove_from_cart(cart_id):
         
         cart = cart_resp.data[0]
         
-        # 4. 본인 소유 확인
-        if cart.get("user_id") != user_id:
+        # 4. 본인 소유 확인 (보안: 다른 사용자의 cart_id 접근 차단)
+        if str(cart.get("user_id")) != str(user_id):
             return jsonify({
                 "success": False,
                 "message": "이 장바구니 항목에 접근할 권한이 없습니다"

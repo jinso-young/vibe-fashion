@@ -358,8 +358,10 @@
             console.log('Cart add response:', data);
 
             if (response.ok && data.success) {
+                if (typeof loadCartFromServer === 'function') {
+                    await loadCartFromServer();
+                }
                 alert(data.message);
-                // 성공 시 장바구니 뱃지 업데이트 (필요하면 추가)
             } else {
                 alert(data.message || '장바구니 추가에 실패했습니다.');
             }
