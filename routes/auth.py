@@ -1198,7 +1198,11 @@ def google_login():
         res = supabase.auth.sign_in_with_oauth({
             "provider": "google",
             "options": {
-                "redirect_to": redirect_to
+                "redirect_to": redirect_to,
+                "scopes": "openid email profile",
+                "query_params": {
+                    "prompt": "select_account"
+                }
             }
         })
         storage = getattr(supabase.auth, "_storage", None)
