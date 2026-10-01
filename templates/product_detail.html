@@ -190,6 +190,8 @@
             // JavaScript fetch로 색상별 사이즈 및 재고 목록 API 호출 (GET /api/products/<product_id>/sizes?color=...)
             const response = await fetch(`/api/products/${PRODUCT_ID}/sizes?color=${encodeURIComponent(color)}`);
             const sizes = await response.json();
+            
+            console.log('API Response for color:', color, sizes);
 
             if (!Array.isArray(sizes) || sizes.length === 0) {
                 sizeSelect.innerHTML = '<option value="" selected disabled>선택 가능한 사이즈가 없습니다</option>';
@@ -201,6 +203,15 @@
                 const optionId = opt.id;
                 const sizeName = opt.size;
                 const stock = parseInt(opt.stock) || 0;
+                
+                // 디버깅: 콘솔에 옵션 정보 출력
+                console.log('Option:', {id: optionId, size: sizeName, stock: stock});
+                
+                if (!optionId) {
+                    console.warn('Warning: optionId is missing for size', sizeName);
+                    return; // skip this option
+                }
+                
                 if (stock === 0) {
                     // 재고가 0인 항목: "(품절)" 표시 + disabled 처리
                     html += `<option value="${optionId}" data-stock="0" disabled>${sizeName} (품절)</option>`;
@@ -326,19 +337,25 @@
         const opt = getSelectedOptionDetails();
         if (!opt) return;
 
+        console.log('Adding to cart:', opt);
+
         try {
+            const payload = {
+                product_option_id: opt.productOptionId,
+                quantity: opt.quantity
+            };
+            console.log('Cart add payload:', payload);
+            
             const response = await fetch('/cart/add', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({
-                    product_option_id: opt.productOptionId,
-                    quantity: opt.quantity
-                })
+                body: JSON.stringify(payload)
             });
 
             const data = await response.json();
+            console.log('Cart add response:', data);
 
             if (response.ok && data.success) {
                 alert(data.message);
