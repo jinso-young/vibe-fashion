@@ -1,0 +1,176 @@
+{% extends "base.html" %}
+
+{% block title %}장바구니 - VIBE-FASHION{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <!-- 페이지 제목 -->
+    <div class="mb-5">
+        <h1 class="fw-bold mb-1">🛒 장바구니</h1>
+        <p class="text-muted">선택하신 상품들이 여기에 담겨있습니다.</p>
+    </div>
+
+    {% if cart_items %}
+        <!-- 장바구니 아이템 리스트 -->
+        <div class="row">
+            <div class="col-lg-8">
+                <div class="list-group list-group-flush">
+                    {% for item in cart_items %}
+                    <div class="list-group-item px-0 py-4 border-bottom">
+                        <div class="row align-items-center">
+                            <!-- 상품 이미지 -->
+                            <div class="col-auto me-3">
+                                <img src="{{ item.thumbnail_url }}" alt="{{ item.product_name }}" 
+                                     class="rounded" style="width: 100px; height: 100px; object-fit: cover;">
+                            </div>
+
+                            <!-- 상품 정보 -->
+                            <div class="col-sm">
+                                <h6 class="mb-2 fw-bold">{{ item.product_name }}</h6>
+                                <small class="text-muted d-block">
+                                    <span class="badge bg-light text-dark">{{ item.color }}</span>
+                                    <span class="badge bg-light text-dark">{{ item.size }}</span>
+                                </small>
+                                <p class="mb-0 mt-2">
+                                    <span class="fw-bold text-dark">{{ item.formatted_price }}</span>
+                                </p>
+                            </div>
+
+                            <!-- 수량 및 가격 -->
+                            <div class="col-sm-auto text-end">
+                                <div class="mb-3">
+                                    <label class="form-label small text-muted d-block mb-2">수량</label>
+                                    <div class="btn-group btn-group-sm" role="group">
+                                        <button type="button" class="btn btn-outline-secondary" 
+                                                onclick="updateCartQuantity('{{ item.cart_id }}', {{ item.quantity }} - 1)">−</button>
+                                        <span class="btn btn-light" disabled>{{ item.quantity }}</span>
+                                        <button type="button" class="btn btn-outline-secondary" 
+                                                onclick="updateCartQuantity('{{ item.cart_id }}', {{ item.quantity }} + 1)">+</button>
+                                    </div>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label class="form-label small text-muted d-block mb-2">합계</label>
+                                    <p class="fw-bold text-dark mb-0">{{ item.formatted_item_total }}</p>
+                                </div>
+
+                                <button type="button" class="btn btn-sm btn-outline-danger" 
+                                        onclick="removeFromCart('{{ item.cart_id }}')">
+                                    삭제
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- 결제 요약 (우측) -->
+            <div class="col-lg-4">
+                <div class="card border-0 shadow-sm rounded-4 position-sticky" style="top: 20px;">
+                    <div class="card-body p-4">
+                        <h5 class="fw-bold mb-4">결제 요약</h5>
+
+                        <div class="d-flex justify-content-between mb-3">
+                            <span class="text-muted">상품 총액</span>
+                            <span class="fw-bold">{{ formatted_total }}</span>
+                        </div>
+
+                        <div class="d-flex justify-content-between mb-3">
+                            <span class="text-muted">배송료</span>
+                            <span class="fw-bold text-success">무료</span>
+                        </div>
+
+                        <hr>
+
+                        <div class="d-flex justify-content-between mb-4">
+                            <span class="fw-bold">합계</span>
+                            <span class="fw-bold fs-5">{{ formatted_total }}</span>
+                        </div>
+
+                        <!-- 구매 버튼들 -->
+                        <button class="btn btn-dark w-100 py-3 fw-bold rounded-pill mb-2" 
+                                onclick="proceedToCheckout()">
+                            결제하기
+                        </button>
+
+                        <a href="/" class="btn btn-outline-dark w-100 py-3 fw-bold rounded-pill">
+                            계속 쇼핑하기
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    {% else %}
+        <!-- 빈 장바구니 -->
+        <div class="text-center py-5">
+            <div style="font-size: 60px; margin-bottom: 20px;">🛒</div>
+            <h4 class="fw-bold mb-2">장바구니가 비어있습니다</h4>
+            <p class="text-muted mb-4">
+                관심 있는 상품을 장바구니에 담아보세요!
+            </p>
+            <a href="/" class="btn btn-dark btn-lg px-5 py-3 fw-bold rounded-pill">
+                쇼핑 시작하기
+            </a>
+        </div>
+    {% endif %}
+</div>
+
+<!-- 장바구니 수정 JavaScript -->
+<script>
+    async function updateCartQuantity(cartId, newQuantity) {
+        if (newQuantity < 1) {
+            removeFromCart(cartId);
+            return;
+        }
+
+        try {
+            const response = await fetch(`/cart/update`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    cart_id: cartId,
+                    quantity: newQuantity
+                })
+            });
+
+            const data = await response.json();
+            if (data.success) {
+                location.reload();
+            } else {
+                alert(data.message || '수량 변경 실패');
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            alert('수량 변경 중 오류가 발생했습니다.');
+        }
+    }
+
+    async function removeFromCart(cartId) {
+        if (!confirm('이 상품을 장바구니에서 제거하시겠습니까?')) return;
+
+        try {
+            const response = await fetch(`/cart/remove`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ cart_id: cartId })
+            });
+
+            const data = await response.json();
+            if (data.success) {
+                location.reload();
+            } else {
+                alert(data.message || '삭제 실패');
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            alert('삭제 중 오류가 발생했습니다.');
+        }
+    }
+
+    function proceedToCheckout() {
+        alert('결제 기능은 준비 중입니다.');
+        // 향후 결제 페이지로 이동
+    }
+</script>
+{% endblock %}

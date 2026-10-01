@@ -418,3 +418,68 @@ def add_to_cart():
             "success": False,
             "message": f"장바구니 추가 중 오류가 발생했습니다. ({str(e)[:100]})"
         }), 500
+
+
+@main_bp.route("/cart")
+def view_cart():
+    """
+    장바구니 조회 페이지 (GET /cart)
+    - 로그인 필수
+    - 사용자의 carts 테이블 데이터를 조회하여 표시
+    - 상품명, 가격, 이미지, 수량, 합계 표시
+    """
+    user_id = session.get("user_id")
+    if not user_id:
+        user_obj = session.get("user")
+        if isinstance(user_obj, dict) and user_obj.get("id"):
+            user_id = user_obj["id"]
+        else:
+            return redirect(url_for("auth.login", error="login_required"))
+    
+    cart_items = []
+    total_price = 0
+    
+    try:
+        supabase = get_supabase_client()
+        if supabase:
+            # carts 테이블에서 해당 사용자의 장바구니 조회
+            # product, product_options 정보도 함께 조회
+            cart_resp = supabase.table("carts")\
+                .select("id, product_id, option_id, quantity, products(id, name, price, thumbnail_url), product_options(id, color, size, stock)")\
+                .eq("user_id", user_id)\
+                .execute()
+            
+            if cart_resp.data:
+                for cart in cart_resp.data:
+                    product = cart.get("products") or {}
+                    option = cart.get("product_options") or {}
+                    quantity = int(cart.get("quantity") or 1)
+                    product_price = int(product.get("price") or 0)
+                    item_total = product_price * quantity
+                    total_price += item_total
+                    
+                    cart_items.append({
+                        "cart_id": cart.get("id"),
+                        "product_id": product.get("id"),
+                        "option_id": option.get("id"),
+                        "product_name": product.get("name"),
+                        "color": option.get("color"),
+                        "size": option.get("size"),
+                        "price": product_price,
+                        "quantity": quantity,
+                        "item_total": item_total,
+                        "formatted_price": f"{product_price:,}원",
+                        "formatted_item_total": f"{item_total:,}원",
+                        "thumbnail_url": product.get("thumbnail_url") or f"https://picsum.photos/seed/{product.get('id', 'item')}/200/200"
+                    })
+    
+    except Exception as e:
+        print(f"[장바구니 조회 오류]: {e}", file=sys.stderr)
+    
+    return render_template(
+        "cart.html",
+        cart_items=cart_items,
+        total_price=total_price,
+        formatted_total=f"{total_price:,}원" if total_price > 0 else "0원",
+        brand_name="VIBE-FASHION"
+    )
