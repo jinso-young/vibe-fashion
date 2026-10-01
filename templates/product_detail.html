@@ -87,8 +87,8 @@
                         <span>사이즈 선택 <span class="text-danger">*</span></span>
                         <span id="stockStatusBadge" class="small"></span>
                     </label>
-                    <select class="form-select form-select-lg rounded-3" id="sizeSelect" onchange="onSizeChange()" {% if available_colors %}disabled{% endif %}>
-                        <option value="" selected disabled>{% if available_colors %}색상을 먼저 선택해주세요{% else %}사이즈를 선택해주세요{% endif %}</option>
+                    <select class="form-select form-select-lg rounded-3" id="sizeSelect" onchange="onSizeChange()" disabled>
+                        <option value="" selected disabled>색상을 먼저 선택해주세요</option>
                     </select>
                 </div>
 
@@ -337,5 +337,13 @@
         // 단일 상품 바로 주문서 오픈
         buyNow(opt.fullName, PRODUCT_PRICE * opt.quantity, PRODUCT_IMAGE);
     }
+
+    // 페이지 로드 후 첫 색상의 사이즈 자동 로드
+    document.addEventListener('DOMContentLoaded', function() {
+        const colorSelect = document.getElementById('colorSelect');
+        if (colorSelect && colorSelect.value) {
+            onColorChange(colorSelect.value);
+        }
+    });
 </script>
 {% endblock %}
