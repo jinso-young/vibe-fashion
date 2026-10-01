@@ -1137,11 +1137,50 @@ def mypage():
         except Exception as e:
             logger.warning(f"마이페이지 프로필 로드 경고: {e}")
 
+    # 3. 마이페이지 장바구니 데이터 조회
+    cart_items = []
+    cart_total = 0
+    try:
+        if supabase and user_id:
+            cart_resp = supabase.table("carts")\
+                .select("id, product_id, option_id, quantity, products(id, name, price, thumbnail_url), product_options(id, color, size, stock)")\
+                .eq("user_id", user_id)\
+                .execute()
+            
+            if cart_resp.data:
+                for cart in cart_resp.data:
+                    product = cart.get("products") or {}
+                    option = cart.get("product_options") or {}
+                    quantity = int(cart.get("quantity") or 1)
+                    product_price = int(product.get("price") or 0)
+                    item_total = product_price * quantity
+                    cart_total += item_total
+                    
+                    cart_items.append({
+                        "cart_id": cart.get("id"),
+                        "product_id": product.get("id"),
+                        "option_id": option.get("id"),
+                        "product_name": product.get("name"),
+                        "color": option.get("color"),
+                        "size": option.get("size"),
+                        "price": product_price,
+                        "quantity": quantity,
+                        "item_total": item_total,
+                        "formatted_price": f"{product_price:,}원",
+                        "formatted_item_total": f"{item_total:,}원",
+                        "thumbnail_url": product.get("thumbnail_url") or f"https://picsum.photos/seed/{product.get('id', 'item')}/200/200"
+                    })
+    except Exception as e:
+        logger.warning(f"마이페이지 장바구니 조회 경고: {e}")
+
     return render_template(
         "auth/mypage.html",
         user=user,
         error_message=error_msg,
-        success_message=success_msg
+        success_message=success_msg,
+        cart_items=cart_items,
+        cart_total=cart_total,
+        formatted_cart_total=f"{cart_total:,}원"
     )
 
 
