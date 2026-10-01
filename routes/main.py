@@ -9,6 +9,7 @@ Supabase DB와 연동하여 상품 정보를 조회하고 템플릿에 전달합
 import os
 import sys
 import logging
+from functools import wraps
 from flask import Blueprint, render_template, abort, request, jsonify, session, redirect, url_for
 from dotenv import load_dotenv
 from supabase import create_client, Client
