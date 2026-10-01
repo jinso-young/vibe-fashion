@@ -233,11 +233,38 @@ def send_password_reset_email(to_email: str, reset_url: str) -> bool:
 
 
 # =====================================================
+# 세션 유효성 검증 (탈퇴/삭제된 계정의 자동 로그인 방지)
+# =====================================================
+@auth_bp.before_app_request
+def validate_session_user():
+    """
+    모든 요청 전 Flask 세션의 사용자가 Supabase DB에 실제로 존재하는지 확인합니다.
+    (탈퇴/삭제된 계정의 세션이 브라우저에 남아있어 자동으로 로그인된 것처럼 보이는 문제를 원천 차단)
+    """
+    if request.endpoint and (request.endpoint.startswith("static") or request.endpoint in ["auth.logout", "auth.delete_account"]):
+        return
+    user_id = session.get("user_id")
+    if user_id:
+        supabase = get_supabase_client()
+        admin_client = get_supabase_admin_client()
+        client = admin_client or supabase
+        if client:
+            try:
+                prof_resp = client.table("profiles").select("id").eq("id", user_id).execute()
+                if not prof_resp.data:
+                    logger.info(f"Supabase에 존재하지 않는 계정 세션 감지 (user_id={user_id}) -> 세션 즉시 파기")
+                    session.clear()
+            except Exception as e:
+                logger.warning(f"세션 유저 검증 오류: {e}")
+
+
+# =====================================================
 # 로그인 필수 데코레이터 (login_required)
 # =====================================================
 def login_required(f):
     """
     Flask session에서 user_id를 확인하여 미로그인 사용자를 로그인 페이지로 안내합니다.
+    Supabase DB에 유저가 존재하지 않는 경우 세션을 즉시 파기합니다.
     """
     @wraps(f)
     def decorated_function(*args, **kwargs):
@@ -246,9 +273,25 @@ def login_required(f):
             # session['user'] 딕셔너리에 id가 있는 경우 session['user_id'] 동기화
             user_obj = session.get("user")
             if isinstance(user_obj, dict) and user_obj.get("id"):
-                session["user_id"] = user_obj["id"]
+                user_id = user_obj["id"]
+                session["user_id"] = user_id
             else:
                 return redirect(url_for("auth.login", error="login_required"))
+
+        # DB에 유저가 실제 존재하는지 검증 (삭제된 유저 세션 방지)
+        supabase = get_supabase_client()
+        admin_client = get_supabase_admin_client()
+        client = admin_client or supabase
+        if client and user_id:
+            try:
+                prof_resp = client.table("profiles").select("id").eq("id", user_id).execute()
+                if not prof_resp.data:
+                    logger.info(f"Supabase에서 삭제된 사용자 세션 감지 (user_id={user_id}) -> 세션 파기")
+                    session.clear()
+                    return redirect(url_for("auth.login", error="login_required"))
+            except Exception as e:
+                logger.warning(f"login_required 사용자 확인 오류: {e}")
+
         return f(*args, **kwargs)
     return decorated_function
 
@@ -263,8 +306,23 @@ def login():
     로그인 폼 표시 및 로그인 요청을 처리합니다.
     - 이메일 미인증 상태일 경우 error=email_not_confirmed 파라미터와 함께 리다이렉트합니다.
     """
-    if session.get("user_id"):
-        return redirect(url_for("auth.mypage"))
+    user_id = session.get("user_id")
+    if user_id:
+        supabase = get_supabase_client()
+        admin_client = get_supabase_admin_client()
+        client = admin_client or supabase
+        user_exists = False
+        if client:
+            try:
+                prof_resp = client.table("profiles").select("id").eq("id", user_id).execute()
+                if prof_resp.data:
+                    user_exists = True
+            except Exception:
+                pass
+        if user_exists:
+            return redirect(url_for("auth.mypage"))
+        else:
+            session.clear()
 
     if request.method == "POST":
         email = request.form.get("email", "").strip()
@@ -989,12 +1047,17 @@ def mypage():
             try:
                 # 1. profiles 테이블 조회
                 prof_resp = client.table("profiles").select("*").eq("id", user_id).execute()
-                if prof_resp.data:
-                    profile = prof_resp.data[0]
-                    user["name"] = profile.get("full_name") or user.get("name")
-                    user["email"] = profile.get("email") or user.get("email")
-                    user["grade"] = profile.get("grade") or user.get("grade", "BRONZE")
-                    user["role"] = profile.get("role") or user.get("role", "customer")
+                if not prof_resp.data:
+                    # Supabase에서 삭제된 계정 -> 세션 파기 후 로그인 페이지 이동
+                    logger.info(f"마이페이지 접근 중 삭제된 계정 감지: user_id={user_id} -> 세션 파기")
+                    session.clear()
+                    return redirect(url_for("auth.login", error="login_required"))
+
+                profile = prof_resp.data[0]
+                user["name"] = profile.get("full_name") or user.get("name")
+                user["email"] = profile.get("email") or user.get("email")
+                user["grade"] = profile.get("grade") or user.get("grade", "BRONZE")
+                user["role"] = profile.get("role") or user.get("role", "customer")
                 # 2. profile의 이름이 비어있다면 auth.users 메타데이터 확인
                 if not user.get("name") or user.get("name") == "회원":
                     if admin_client:
@@ -1064,20 +1127,28 @@ def delete_account():
             except Exception as ae:
                 logger.warning(f"auth.admin.delete_user 경고: {ae}")
 
-        # 3. 세션 데이터 완전 초기화
-        session.pop("user_id", None)
-        session.pop("user", None)
-        session.pop("access_token", None)
-        session.pop("refresh_token", None)
-        session.clear()
+        # 3. Supabase 클라이언트 로그아웃
+        if supabase:
+            try:
+                supabase.auth.sign_out()
+            except Exception:
+                pass
 
-        return redirect(url_for("auth.login", success="account_deleted"))
+        # 4. 세션 데이터 완전 초기화 및 브라우저 세션 쿠키 파기
+        session.clear()
+        response = redirect(url_for("auth.login", success="account_deleted"))
+        session_cookie_name = current_app.config.get("SESSION_COOKIE_NAME", "session")
+        response.delete_cookie(session_cookie_name)
+        return response
 
     except Exception as e:
         logger.error(f"회원 탈퇴 처리 실패: {e}")
         # 세션은 안전하게 로그아웃 처리 후 로그인 페이지로 이동
         session.clear()
-        return redirect(url_for("auth.login", error="delete_failed"))
+        response = redirect(url_for("auth.login", error="delete_failed"))
+        session_cookie_name = current_app.config.get("SESSION_COOKIE_NAME", "session")
+        response.delete_cookie(session_cookie_name)
+        return response
 
 
 @auth_bp.route("/auth/logout", methods=["GET"])
@@ -1091,12 +1162,11 @@ def logout():
         except Exception:
             pass
 
-    session.pop("user_id", None)
-    session.pop("user", None)
-    session.pop("access_token", None)
-    session.pop("refresh_token", None)
     session.clear()
-    return redirect(url_for("auth.login", success="logged_out"))
+    response = redirect(url_for("auth.login", success="logged_out"))
+    session_cookie_name = current_app.config.get("SESSION_COOKIE_NAME", "session")
+    response.delete_cookie(session_cookie_name)
+    return response
 
 
 # =====================================================
@@ -1111,6 +1181,12 @@ def kakao_login():
     - redirect_to는 환경변수 SITE_URL + '/auth/callback'을 사용합니다.
     - PKCE code_verifier를 Flask 세션에 보관하여 콜백에서 세션 교환 시 사용합니다.
     """
+    # 기존 로그인 세션이 남아있다면 초기화
+    session.pop("user_id", None)
+    session.pop("user", None)
+    session.pop("access_token", None)
+    session.pop("refresh_token", None)
+
     supabase = get_supabase_client()
     if not supabase:
         return redirect(url_for("auth.login", error="social_config_missing"))
