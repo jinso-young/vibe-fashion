@@ -225,11 +225,11 @@ def get_product_sizes(product_id):
     try:
         supabase = get_supabase_client()
         if supabase:
-            # product_options에서 product_id + color로 필터링
+            # product_options에서 product_id + color 대소문자 무관(ilike) 필터링
             resp = supabase.table("product_options")\
                 .select("size, stock")\
                 .eq("product_id", product_id)\
-                .eq("color", color)\
+                .ilike("color", color)\
                 .not_.is_("size", "null")\
                 .execute()
 
