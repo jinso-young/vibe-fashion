@@ -5,10 +5,47 @@
  * 쇼핑몰의 장바구니, 위시리스트, 카테고리 필터링, 검색 기능을 담당합니다.
  */
 
-// 1. 장바구니 및 위시리스트 상태 관리 (인메모리 배열)
-const cartState = [];
-const wishlistState = [];
-let wishlistCount = 0;
+// 1. 장바구니 및 위시리스트 상태 관리 (localStorage와 연동)
+const CART_STORAGE_KEY = 'vibe_fashion_cart';
+const WISHLIST_STORAGE_KEY = 'vibe_fashion_wishlist';
+
+function loadCartFromStorage() {
+    try {
+        const stored = localStorage.getItem(CART_STORAGE_KEY);
+        return stored ? JSON.parse(stored) : [];
+    } catch (e) {
+        return [];
+    }
+}
+
+function saveCartToStorage() {
+    try {
+        localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(cartState));
+    } catch (e) {
+        console.error('장바구니 저장 실패:', e);
+    }
+}
+
+function loadWishlistFromStorage() {
+    try {
+        const stored = localStorage.getItem(WISHLIST_STORAGE_KEY);
+        return stored ? JSON.parse(stored) : [];
+    } catch (e) {
+        return [];
+    }
+}
+
+function saveWishlistToStorage() {
+    try {
+        localStorage.setItem(WISHLIST_STORAGE_KEY, JSON.stringify(wishlistState));
+    } catch (e) {
+        console.error('위시리스트 저장 실패:', e);
+    }
+}
+
+const cartState = loadCartFromStorage();
+const wishlistState = loadWishlistFromStorage();
+let wishlistCount = wishlistState.length;
 
 /**
  * 가격 문자열 또는 숫자를 안전하게 정수형 숫자로 변환하는 헬퍼 함수
@@ -56,6 +93,8 @@ function addToCart(name, price, imageUrl) {
         imageUrl: imageUrl
     });
 
+    saveCartToStorage();
+
     // 장바구니 뱃지 숫자 갱신
     updateCartUI();
 
@@ -70,6 +109,7 @@ function addToCart(name, price, imageUrl) {
 function removeFromCart(index) {
     if (index >= 0 && index < cartState.length) {
         cartState.splice(index, 1);
+        saveCartToStorage();
         updateCartUI();
     }
 }
@@ -173,6 +213,7 @@ function handleCheckout() {
 
     // 6. 장바구니 비우기 및 UI 갱신
     cartState.length = 0;
+    saveCartToStorage();
     updateCartUI();
 
     // 7. 주문 완료 모달 정보 세팅 및 표시
@@ -241,6 +282,7 @@ function toggleWishlist(btn, productName, price, imageUrl, detailUrl) {
         showToast(`"${productName}" 상품을 위시리스트에서 제외했습니다.`);
     }
 
+    saveWishlistToStorage();
     updateWishlistUI();
 }
 
@@ -265,6 +307,7 @@ function removeFromWishlist(index) {
             }
         });
 
+        saveWishlistToStorage();
         updateWishlistUI();
     }
 }
@@ -415,4 +458,65 @@ function quickSearch(tag) {
         input.value = tag;
         performSearch();
     }
+}
+
+/**
+ * 페이지 로드 시 장바구니 및 위시리스트 상태 초기화
+ */
+document.addEventListener('DOMContentLoaded', () => {
+    updateCartUI();
+    updateWishlistUI();
+    renderMypageCartSection();
+});
+
+/**
+ * 마이페이지의 장바구니 영역 렌더링 함수
+ */
+function renderMypageCartSection() {
+    const container = document.getElementById('mypage-cart-list');
+    const emptyEl = document.getElementById('mypage-cart-empty');
+    const countBadge = document.getElementById('mypage-cart-count');
+    const totalEl = document.getElementById('mypage-cart-total');
+
+    if (!container) return;
+
+    if (countBadge) {
+        countBadge.textContent = cartState.length;
+    }
+
+    if (!cartState || cartState.length === 0) {
+        if (emptyEl) emptyEl.style.display = 'block';
+        container.innerHTML = '';
+        if (totalEl) totalEl.textContent = '0원';
+        return;
+    }
+
+    if (emptyEl) emptyEl.style.display = 'none';
+
+    let total = 0;
+    let html = '';
+
+    cartState.forEach((item, idx) => {
+        const itemPrice = parsePrice(item.price);
+        total += itemPrice;
+        html += `
+            <div class="d-flex align-items-center justify-content-between p-3 border rounded-3 mb-2 bg-white shadow-xs">
+                <div class="d-flex align-items-center gap-3">
+                    <img src="${item.imageUrl}" alt="${item.name}" class="rounded-3" style="width: 55px; height: 55px; object-fit: cover;">
+                    <div>
+                        <div class="fw-bold small text-dark">${item.name}</div>
+                        <div class="text-danger fw-bold small">${itemPrice.toLocaleString()}원</div>
+                    </div>
+                </div>
+                <div class="d-flex align-items-center gap-2">
+                    <button type="button" class="btn btn-sm btn-outline-danger border-0" onclick="removeFromCart(${idx}); renderMypageCartSection();" title="삭제">
+                        <i class="bi bi-trash fs-6"></i>
+                    </button>
+                </div>
+            </div>
+        `;
+    });
+
+    container.innerHTML = html;
+    if (totalEl) totalEl.textContent = total.toLocaleString() + '원';
 }
