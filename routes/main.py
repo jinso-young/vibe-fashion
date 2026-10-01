@@ -400,7 +400,9 @@ def add_to_cart():
     
     except Exception as e:
         print(f"[장바구니 담기 오류]: {e}", file=sys.stderr)
+        import traceback
+        traceback.print_exc()
         return jsonify({
             "success": False,
-            "message": "장바구니 추가 중 오류가 발생했습니다."
+            "message": f"장바구니 추가 중 오류가 발생했습니다. ({str(e)[:100]})"
         }), 500
