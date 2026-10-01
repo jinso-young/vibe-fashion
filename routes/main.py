@@ -9,7 +9,7 @@ Supabase DB와 연동하여 상품 정보를 조회하고 템플릿에 전달합
 import os
 import sys
 import logging
-from flask import Blueprint, render_template, abort
+from flask import Blueprint, render_template, abort, request, jsonify
 from dotenv import load_dotenv
 from supabase import create_client, Client
 
@@ -160,25 +160,34 @@ def index():
     )
 
 
+@main_bp.route("/products/<product_id>")
 @main_bp.route("/product/<product_id>")
 def product_detail(product_id):
     """
-    상품 상세 페이지 라우트
+    상품 상세 페이지 라우트 (GET /products/<product_id> 및 GET /product/<product_id>)
 
     :param product_id: URL에서 전달된 상품 ID (UUID 또는 식별자)
     """
     product = None
     related_products = []
+    available_colors = []
 
     try:
         supabase = get_supabase_client()
         if supabase:
-            # 해당 상품 상세 조회
+            # 1. 해당 상품 상세 조회
             resp = supabase.table("products").select("*, product_images(*), product_options(*), categories(*)").eq("id", product_id).execute()
             if resp.data:
                 product = format_product(resp.data[0])
 
-            # 연관 추천 상품 (현재 상품 제외 최대 3개)
+            # 2. product_options 테이블에서 색상(color) 목록 DISTINCT 조회
+            opt_resp = supabase.table("product_options").select("color").eq("product_id", product_id).not_.is_("color", "null").execute()
+            if opt_resp.data:
+                raw_colors = [row.get("color") for row in opt_resp.data if row.get("color")]
+                # 중복 제거 및 정렬
+                available_colors = sorted(list(dict.fromkeys(raw_colors)))
+
+            # 3. 연관 추천 상품 (현재 상품 제외 최대 3개)
             rel_resp = supabase.table("products").select("*, product_images(*), categories(*)").neq("id", product_id).limit(3).execute()
             if rel_resp.data:
                 for rel in rel_resp.data:
@@ -193,6 +202,41 @@ def product_detail(product_id):
     return render_template(
         "product_detail.html",
         product=product,
+        available_colors=available_colors,
         related_products=related_products,
         brand_name="VIBE-FASHION"
     )
+
+
+@main_bp.route("/products/<product_id>/options")
+@main_bp.route("/api/products/<product_id>/options")
+def get_product_options(product_id):
+    """
+    선택한 색상에 따른 사이즈 및 재고 목록 반환 API (fetch 연동용)
+    - query param: color (예: ?color=Black)
+    - return: [{size: "S", stock: 0}, {size: "M", stock: 15}, ...]
+    """
+    color = request.args.get("color", "").strip()
+    if not color:
+        return jsonify({"sizes": []})
+
+    sizes = []
+    try:
+        supabase = get_supabase_client()
+        if supabase:
+            resp = supabase.table("product_options")\
+                .select("id, size, stock, additional_price")\
+                .eq("product_id", product_id)\
+                .eq("color", color)\
+                .not_.is_("size", "null")\
+                .order("size")\
+                .execute()
+            
+            # 사이즈 순서 정렬 (S -> M -> L -> XL)
+            size_order = {"XS": 1, "S": 2, "M": 3, "L": 4, "XL": 5, "XXL": 6, "FREE": 7}
+            sizes = resp.data or []
+            sizes.sort(key=lambda x: size_order.get((x.get("size") or "").upper(), 99))
+    except Exception as e:
+        print(f"[상품 옵션 API 조회 오류]: {e}", file=sys.stderr)
+
+    return jsonify({"sizes": sizes})
