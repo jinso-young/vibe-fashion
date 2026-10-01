@@ -208,35 +208,46 @@ def product_detail(product_id):
     )
 
 
+@main_bp.route("/api/products/<product_id>/sizes")
 @main_bp.route("/products/<product_id>/options")
 @main_bp.route("/api/products/<product_id>/options")
-def get_product_options(product_id):
+def get_product_sizes(product_id):
     """
-    선택한 색상에 따른 사이즈 및 재고 목록 반환 API (fetch 연동용)
-    - query param: color (예: ?color=Black)
-    - return: [{size: "S", stock: 0}, {size: "M", stock: 15}, ...]
+    상품 색상별 사이즈 및 재고 목록 조회 API (GET /api/products/<product_id>/sizes?color=<선택한 색상>)
+    - product_options 테이블에서 product_id와 color로 필터링
+    - size, stock을 JSON 배열로 반환 (예: [{"size": "S", "stock": 3}, {"size": "M", "stock": 0}])
     """
     color = request.args.get("color", "").strip()
     if not color:
-        return jsonify({"sizes": []})
+        return jsonify([])
 
-    sizes = []
+    result = []
     try:
         supabase = get_supabase_client()
         if supabase:
+            # product_options에서 product_id + color로 필터링
             resp = supabase.table("product_options")\
-                .select("id, size, stock, additional_price")\
+                .select("size, stock")\
                 .eq("product_id", product_id)\
                 .eq("color", color)\
                 .not_.is_("size", "null")\
-                .order("size")\
                 .execute()
-            
-            # 사이즈 순서 정렬 (S -> M -> L -> XL)
-            size_order = {"XS": 1, "S": 2, "M": 3, "L": 4, "XL": 5, "XXL": 6, "FREE": 7}
-            sizes = resp.data or []
-            sizes.sort(key=lambda x: size_order.get((x.get("size") or "").upper(), 99))
-    except Exception as e:
-        print(f"[상품 옵션 API 조회 오류]: {e}", file=sys.stderr)
 
-    return jsonify({"sizes": sizes})
+            raw_list = resp.data or []
+            # 사이즈 순서 정렬 (XS -> S -> M -> L -> XL -> XXL -> FREE)
+            size_order = {"XS": 1, "S": 2, "M": 3, "L": 4, "XL": 5, "XXL": 6, "FREE": 7}
+            raw_list.sort(key=lambda x: size_order.get((x.get("size") or "").upper(), 99))
+
+            # size, stock 형태의 깔끔한 딕셔너리 리스트로 정제
+            result = [
+                {
+                    "size": item.get("size"),
+                    "stock": int(item.get("stock") or 0)
+                }
+                for item in raw_list
+            ]
+    except Exception as e:
+        print(f"[사이즈 목록 API 조회 오류]: {e}", file=sys.stderr)
+        return jsonify([]), 500
+
+    return jsonify(result)

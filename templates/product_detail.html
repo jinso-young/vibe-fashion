@@ -187,27 +187,35 @@
         quantityInput.max = 10;
 
         try {
-            // JavaScript fetch로 해당 색상의 사이즈 및 재고 목록 조회
-            const response = await fetch(`/products/${PRODUCT_ID}/options?color=${encodeURIComponent(color)}`);
-            const data = await response.json();
-            const sizes = data.sizes || [];
+            // JavaScript fetch로 색상별 사이즈 및 재고 목록 API 호출 (GET /api/products/<product_id>/sizes?color=...)
+            const response = await fetch(`/api/products/${PRODUCT_ID}/sizes?color=${encodeURIComponent(color)}`);
+            const sizes = await response.json();
 
-            if (sizes.length === 0) {
+            if (!Array.isArray(sizes) || sizes.length === 0) {
                 sizeSelect.innerHTML = '<option value="" selected disabled>선택 가능한 사이즈가 없습니다</option>';
                 return;
             }
 
             let html = '<option value="" selected disabled>사이즈를 선택해주세요</option>';
             sizes.forEach(opt => {
-                const stock = opt.stock || 0;
+                const sizeName = opt.size;
+                const stock = parseInt(opt.stock) || 0;
                 if (stock === 0) {
-                    // 재고가 0인 사이즈: 품절 표시 및 disabled 처리
-                    html += `<option value="${opt.size}" data-stock="0" disabled>${opt.size} (품절)</option>`;
+                    // 재고가 0인 항목: "(품절)" 표시 + disabled 처리
+                    html += `<option value="${sizeName}" data-stock="0" disabled>${sizeName} (품절)</option>`;
                 } else if (stock === 1) {
-                    html += `<option value="${opt.size}" data-stock="${stock}">${opt.size} (품절 임박 - 1개 남음)</option>`;
+                    html += `<option value="${sizeName}" data-stock="${stock}">${sizeName} (품절 임박 - 1개 남음)</option>`;
                 } else {
-                    html += `<option value="${opt.size}" data-stock="${stock}">${opt.size} (재고 ${stock}개)</option>`;
+                    html += `<option value="${sizeName}" data-stock="${stock}">${sizeName} (재고 ${stock}개)</option>`;
                 }
+            });
+
+            sizeSelect.innerHTML = html;
+            sizeSelect.disabled = false;
+        } catch (error) {
+            console.error('사이즈 옵션 로드 실패:', error);
+            sizeSelect.innerHTML = '<option value="" selected disabled>옵션을 불러오지 못했습니다</option>';
+        }
             });
 
             sizeSelect.innerHTML = html;
