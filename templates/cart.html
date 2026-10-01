@@ -125,13 +125,10 @@
         }
 
         try {
-            const response = await fetch(`/cart/update`, {
-                method: 'POST',
+            const response = await fetch(`/cart/${cartId}`, {
+                method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    cart_id: cartId,
-                    quantity: newQuantity
-                })
+                body: JSON.stringify({ quantity: newQuantity })
             });
 
             const data = await response.json();
@@ -150,10 +147,9 @@
         if (!confirm('이 상품을 장바구니에서 제거하시겠습니까?')) return;
 
         try {
-            const response = await fetch(`/cart/remove`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ cart_id: cartId })
+            const response = await fetch(`/cart/${cartId}`, {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json' }
             });
 
             const data = await response.json();

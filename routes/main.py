@@ -483,3 +483,222 @@ def view_cart():
         formatted_total=f"{total_price:,}원" if total_price > 0 else "0원",
         brand_name="VIBE-FASHION"
     )
+
+
+@main_bp.route("/cart/<cart_id>", methods=["PATCH"])
+def update_cart_quantity(cart_id):
+    """
+    장바구니 수량 변경 API (PATCH /cart/<cart_id>)
+    
+    Request JSON:
+    - quantity: 변경할 새 수량 (정수, >= 1)
+    
+    Response:
+    - 성공 (200): {"success": true, "subtotal": 50000, "message": "수량이 변경되었습니다"}
+    - 실패 (400/404): {"success": false, "message": "에러 메시지"}
+    """
+    # 1. 로그인 확인
+    user_id = session.get("user_id")
+    if not user_id:
+        user_obj = session.get("user")
+        if isinstance(user_obj, dict) and user_obj.get("id"):
+            user_id = user_obj["id"]
+        else:
+            return jsonify({
+                "success": False,
+                "message": "로그인이 필요합니다"
+            }), 401
+    
+    # 2. 요청 body에서 quantity 추출
+    try:
+        data = request.get_json() or {}
+        quantity = data.get("quantity")
+        
+        try:
+            quantity = int(quantity)
+        except (TypeError, ValueError):
+            return jsonify({
+                "success": False,
+                "message": "quantity는 정수여야 합니다"
+            }), 400
+        
+        if quantity < 1:
+            return jsonify({
+                "success": False,
+                "message": "수량은 1 이상이어야 합니다"
+            }), 400
+    
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "message": "잘못된 요청입니다"
+        }), 400
+    
+    # 3. Supabase 클라이언트 초기화
+    supabase = get_supabase_admin_client()
+    if not supabase:
+        supabase = get_supabase_client()
+    
+    if not supabase:
+        return jsonify({
+            "success": False,
+            "message": "데이터베이스 연결 실패"
+        }), 500
+    
+    try:
+        # 4. cart 조회 (해당 cart_id가 현재 사용자 소유인지 확인)
+        cart_resp = supabase.table("carts")\
+            .select("id, user_id, option_id, quantity")\
+            .eq("id", cart_id)\
+            .execute()
+        
+        if not cart_resp.data:
+            return jsonify({
+                "success": False,
+                "message": "존재하지 않는 장바구니 항목입니다"
+            }), 404
+        
+        cart = cart_resp.data[0]
+        
+        # 5. 본인 소유 확인 (보안: 다른 사용자의 cart 접근 차단)
+        if cart.get("user_id") != user_id:
+            return jsonify({
+                "success": False,
+                "message": "이 장바구니 항목에 접근할 권한이 없습니다"
+            }), 403
+        
+        option_id = cart.get("option_id")
+        
+        # 6. product_options에서 stock 조회 및 product 정보 함께 조회
+        opt_resp = supabase.table("product_options")\
+            .select("id, product_id, stock")\
+            .eq("id", option_id)\
+            .execute()
+        
+        if not opt_resp.data:
+            return jsonify({
+                "success": False,
+                "message": "상품 옵션을 찾을 수 없습니다"
+            }), 404
+        
+        option = opt_resp.data[0]
+        stock = int(option.get("stock") or 0)
+        product_id = option.get("product_id")
+        
+        # 7. 변경하려는 수량이 재고를 초과하는지 확인
+        if quantity > stock:
+            return jsonify({
+                "success": False,
+                "message": f"재고가 부족합니다(현재 {stock}개)"
+            }), 400
+        
+        # 8. carts 테이블 UPDATE
+        update_resp = supabase.table("carts")\
+            .update({"quantity": quantity})\
+            .eq("id", cart_id)\
+            .execute()
+        
+        if not update_resp.data:
+            raise Exception("UPDATE 실패")
+        
+        # 9. 새 소계(subtotal) 계산
+        prod_resp = supabase.table("products")\
+            .select("price")\
+            .eq("id", product_id)\
+            .execute()
+        
+        product_price = 0
+        if prod_resp.data:
+            product_price = int(prod_resp.data[0].get("price") or 0)
+        
+        subtotal = product_price * quantity
+        
+        # 10. 성공 응답
+        return jsonify({
+            "success": True,
+            "subtotal": subtotal,
+            "message": "수량이 변경되었습니다"
+        }), 200
+    
+    except Exception as e:
+        print(f"[장바구니 수량 변경 오류]: {e}", file=sys.stderr)
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            "success": False,
+            "message": f"수량 변경 중 오류가 발생했습니다. ({str(e)[:100]})"
+        }), 500
+
+
+@main_bp.route("/cart/<cart_id>", methods=["DELETE"])
+def remove_from_cart(cart_id):
+    """
+    장바구니 항목 삭제 API (DELETE /cart/<cart_id>)
+    
+    Response:
+    - 성공 (200): {"success": true, "message": "장바구니에서 제거되었습니다"}
+    - 실패 (400/404): {"success": false, "message": "에러 메시지"}
+    """
+    # 1. 로그인 확인
+    user_id = session.get("user_id")
+    if not user_id:
+        user_obj = session.get("user")
+        if isinstance(user_obj, dict) and user_obj.get("id"):
+            user_id = user_obj["id"]
+        else:
+            return jsonify({
+                "success": False,
+                "message": "로그인이 필요합니다"
+            }), 401
+    
+    # 2. Supabase 클라이언트 초기화
+    supabase = get_supabase_admin_client()
+    if not supabase:
+        supabase = get_supabase_client()
+    
+    if not supabase:
+        return jsonify({
+            "success": False,
+            "message": "데이터베이스 연결 실패"
+        }), 500
+    
+    try:
+        # 3. cart 조회 (본인 소유 확인)
+        cart_resp = supabase.table("carts")\
+            .select("id, user_id")\
+            .eq("id", cart_id)\
+            .execute()
+        
+        if not cart_resp.data:
+            return jsonify({
+                "success": False,
+                "message": "존재하지 않는 장바구니 항목입니다"
+            }), 404
+        
+        cart = cart_resp.data[0]
+        
+        # 4. 본인 소유 확인
+        if cart.get("user_id") != user_id:
+            return jsonify({
+                "success": False,
+                "message": "이 장바구니 항목에 접근할 권한이 없습니다"
+            }), 403
+        
+        # 5. carts 테이블에서 DELETE
+        delete_resp = supabase.table("carts")\
+            .delete()\
+            .eq("id", cart_id)\
+            .execute()
+        
+        # 6. 성공 응답
+        return jsonify({
+            "success": True,
+            "message": "장바구니에서 제거되었습니다"
+        }), 200
+    
+    except Exception as e:
+        print(f"[장바구니 삭제 오류]: {e}", file=sys.stderr)
+        return jsonify({
+            "success": False,
+            "message": "삭제 중 오류가 발생했습니다"
+        }), 500
