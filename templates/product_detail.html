@@ -104,10 +104,10 @@
                     <button class="btn btn-outline-dark btn-lg flex-grow-1 py-3 fw-bold rounded-pill" onclick="addToCart('{{ product.name }}', {{ product.price }}, '{{ product.thumbnail_url }}')">
                         <i class="bi bi-bag-plus me-1"></i> 장바구니 담기
                     </button>
-                    <button class="btn btn-dark btn-lg flex-grow-1 py-3 fw-bold rounded-pill" onclick="alert('결제 단계로 이동합니다 (시뮬레이션)')">
-                        바로 구매하기
+                    <button class="btn btn-dark btn-lg flex-grow-1 py-3 fw-bold rounded-pill" onclick="buyNow('{{ product.name }}', {{ product.price }}, '{{ product.thumbnail_url }}')">
+                        <i class="bi bi-credit-card me-1"></i> 바로 구매하기
                     </button>
-                    <button class="btn btn-outline-danger btn-lg px-3 rounded-circle" onclick="toggleWishlist(this, '{{ product.name }}')" title="위시리스트 추가">
+                    <button class="btn btn-outline-danger btn-lg px-3 rounded-circle" onclick="toggleWishlist(this, '{{ product.name }}', {{ product.price }}, '{{ product.thumbnail_url }}', '{{ url_for('main.product_detail', product_id=product.id) }}')" title="위시리스트 추가">
                         <i class="bi bi-heart"></i>
                     </button>
                 </div>

@@ -167,9 +167,36 @@ function updateCartUI() {
 }
 
 /**
- * 장바구니 주문하기 처리 함수
+ * 바로 구매하기 함수 (단일 상품 즉시 주문서 오픈)
  */
-function handleCheckout() {
+function buyNow(name, price, imageUrl) {
+    if (typeof window.IS_LOGGED_IN !== 'undefined' && !window.IS_LOGGED_IN) {
+        const loginModalEl = document.getElementById('loginRequiredModal');
+        if (loginModalEl && typeof bootstrap !== 'undefined') {
+            const loginModal = bootstrap.Modal.getOrCreateInstance(loginModalEl);
+            loginModal.show();
+            return;
+        } else {
+            alert('로그인이 필요한 서비스입니다.');
+            window.location.href = window.LOGIN_URL || '/auth/login';
+            return;
+        }
+    }
+
+    const numericPrice = parsePrice(price);
+    // 단일 상품 구매용 임시 아이템으로 결제창 오픈
+    const singleItem = [{
+        name: name,
+        price: numericPrice,
+        imageUrl: imageUrl
+    }];
+    openCheckoutModalWithItems(singleItem, true);
+}
+
+/**
+ * 결제 모달(주문서 작성창) 열기 - 장바구니 전체
+ */
+function openCheckoutModal() {
     // 1. 로그인 여부 확인
     if (typeof window.IS_LOGGED_IN !== 'undefined' && !window.IS_LOGGED_IN) {
         const loginModalEl = document.getElementById('loginRequiredModal');
@@ -190,13 +217,89 @@ function handleCheckout() {
         return;
     }
 
-    // 3. 총 결제금액 계산
+    openCheckoutModalWithItems(cartState, false);
+}
+
+let currentCheckoutItems = [];
+let isDirectBuyNow = false;
+
+/**
+ * 특정 아이템 목록으로 주문서 모달 오픈
+ */
+function openCheckoutModalWithItems(items, isSingle) {
+    currentCheckoutItems = items;
+    isDirectBuyNow = isSingle;
+
+    // 장바구니 오프캔버스 서랍이 열려있다면 닫기
+    const offcanvasEl = document.getElementById('cartOffcanvas');
+    if (offcanvasEl && typeof bootstrap !== 'undefined') {
+        const offcanvas = bootstrap.Offcanvas.getInstance(offcanvasEl);
+        if (offcanvas) offcanvas.hide();
+    }
+
+    // 모달 내용 렌더링
+    const itemsListEl = document.getElementById('checkoutItemsList');
+    const subtotalEl = document.getElementById('checkoutSubtotal');
+    const totalEl = document.getElementById('checkoutTotal');
+    const payBtnText = document.getElementById('checkoutPayBtnText');
+
     let total = 0;
-    cartState.forEach(item => {
+    let html = '';
+
+    items.forEach(item => {
+        const p = parsePrice(item.price);
+        total += p;
+        html += `
+            <div class="d-flex align-items-center justify-content-between py-2 border-bottom">
+                <div class="d-flex align-items-center gap-2">
+                    <img src="${item.imageUrl}" alt="${item.name}" class="rounded" style="width: 40px; height: 40px; object-fit: cover;">
+                    <span class="small fw-medium text-truncate" style="max-width: 140px;">${item.name}</span>
+                </div>
+                <span class="small fw-bold">${p.toLocaleString()}원</span>
+            </div>
+        `;
+    });
+
+    if (itemsListEl) itemsListEl.innerHTML = html;
+    if (subtotalEl) subtotalEl.textContent = total.toLocaleString() + '원';
+    if (totalEl) totalEl.textContent = total.toLocaleString() + '원';
+    if (payBtnText) payBtnText.textContent = `${total.toLocaleString()}원 결제하기`;
+
+    // 모달 표시
+    const checkoutModalEl = document.getElementById('checkoutModal');
+    if (checkoutModalEl && typeof bootstrap !== 'undefined') {
+        const modal = bootstrap.Modal.getOrCreateInstance(checkoutModalEl);
+        modal.show();
+    }
+}
+
+/**
+ * 실제 결제 처리 함수 (결제 승인 및 주문 완료 처리)
+ */
+function processPayment() {
+    const recipient = document.getElementById('checkoutRecipient')?.value.trim();
+    const phone = document.getElementById('checkoutPhone')?.value.trim();
+    const address = document.getElementById('checkoutAddress')?.value.trim();
+
+    if (!recipient || !phone || !address) {
+        alert('배송지 정보(수령인, 연락처, 주소)를 모두 입력해주세요.');
+        return;
+    }
+
+    const selectedPayMethod = document.querySelector('input[name="paymentMethod"]:checked')?.value || 'kakaopay';
+    const payNames = {
+        'kakaopay': '카카오페이',
+        'naverpay': '네이버페이',
+        'credit_card': '신용카드'
+    };
+    const payName = payNames[selectedPayMethod] || '간편결제';
+
+    let total = 0;
+    currentCheckoutItems.forEach(item => {
         total += parsePrice(item.price);
     });
 
-    // 4. 주문 완료 번호 생성 (ORD-YYYYMMDD-랜덤)
+    // 주문 번호 생성 (ORD-YYYYMMDD-랜덤)
     const now = new Date();
     const dateStr = now.getFullYear().toString() +
                     String(now.getMonth() + 1).padStart(2, '0') +
@@ -204,22 +307,25 @@ function handleCheckout() {
     const randomStr = Math.floor(1000 + Math.random() * 9000);
     const orderNumber = `ORD-${dateStr}-${randomStr}`;
 
-    // 5. 장바구니 오프캔버스 서랍 닫기
-    const offcanvasEl = document.getElementById('cartOffcanvas');
-    if (offcanvasEl && typeof bootstrap !== 'undefined') {
-        const offcanvas = bootstrap.Offcanvas.getInstance(offcanvasEl);
-        if (offcanvas) offcanvas.hide();
+    // 주문서 모달 닫기
+    const checkoutModalEl = document.getElementById('checkoutModal');
+    if (checkoutModalEl && typeof bootstrap !== 'undefined') {
+        const modal = bootstrap.Modal.getInstance(checkoutModalEl);
+        if (modal) modal.hide();
     }
 
-    // 6. 장바구니 비우기 및 UI 갱신
-    cartState.length = 0;
-    saveCartToStorage();
-    updateCartUI();
+    // 장바구니 전체 결제였던 경우 장바구니 비우기
+    if (!isDirectBuyNow) {
+        cartState.length = 0;
+        saveCartToStorage();
+        updateCartUI();
+        renderMypageCartSection();
+    }
 
-    // 7. 주문 완료 모달 정보 세팅 및 표시
+    // 주문 완료 축하 모달 세팅 및 표시
     const orderNumEl = document.getElementById('orderSuccessNumber');
     const orderAmtEl = document.getElementById('orderSuccessAmount');
-    if (orderNumEl) orderNumEl.textContent = orderNumber;
+    if (orderNumEl) orderNumEl.textContent = `${orderNumber} (${payName})`;
     if (orderAmtEl) orderAmtEl.textContent = total.toLocaleString() + '원';
 
     const orderModalEl = document.getElementById('orderSuccessModal');
@@ -227,8 +333,15 @@ function handleCheckout() {
         const orderModal = bootstrap.Modal.getOrCreateInstance(orderModalEl);
         orderModal.show();
     } else {
-        alert(`주문이 정상 접수되었습니다!\n주문번호: ${orderNumber}\n결제금액: ${total.toLocaleString()}원`);
+        alert(`주문 및 결제가 정상 완료되었습니다!\n주문번호: ${orderNumber}\n결제수단: ${payName}\n결제금액: ${total.toLocaleString()}원`);
     }
+}
+
+/**
+ * 장바구니 주문하기 처리 함수 (오프캔버스 하단 버튼 호환)
+ */
+function handleCheckout() {
+    openCheckoutModal();
 }
 
 /**
