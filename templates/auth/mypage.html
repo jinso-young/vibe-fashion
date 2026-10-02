@@ -200,6 +200,38 @@
 
                         <!-- 탭 2: 주문 내역 -->
                         <div class="tab-pane fade" id="orders-tab-pane" role="tabpanel" aria-labelledby="orders-tab" tabindex="0">
+                            {% if orders %}
+                                <div class="d-flex flex-column gap-3">
+                                    {% for o in orders %}
+                                    <div class="border rounded-3 p-3 bg-white shadow-xs">
+                                        <div class="d-flex justify-content-between align-items-center border-bottom pb-2 mb-2">
+                                            <div>
+                                                <span class="fw-bold font-monospace text-dark">{{ o.order_number }}</span>
+                                                <small class="text-muted ms-2">{{ o.created_at }}</small>
+                                            </div>
+                                            <span class="badge {% if o.status == 'paid' %}bg-success{% elif o.status == 'cancelled' %}bg-secondary{% else %}bg-primary{% endif %} rounded-pill">
+                                                {{ o.status_badge }}
+                                            </span>
+                                        </div>
+                                        <div class="mb-2">
+                                            {% for item in o.order_items %}
+                                            <div class="d-flex justify-content-between align-items-center small text-muted py-1">
+                                                <span>{{ item.product_name }} {% if item.option_name %}<span class="badge bg-light text-dark border">{{ item.option_name }}</span>{% endif %} × {{ item.quantity }}개</span>
+                                                <span class="text-dark fw-medium">{{ "{:,}".format((item.total_price or 0)|int) }}원</span>
+                                            </div>
+                                            {% endfor %}
+                                        </div>
+                                        <div class="d-flex justify-content-between align-items-center pt-2 border-top small">
+                                            <span class="text-muted">배송지: {{ o.recipient_name }} | {{ o.shipping_address }}</span>
+                                            <div>
+                                                <span class="text-muted me-2">총 결제금액</span>
+                                                <span class="fw-bold text-danger fs-6">{{ o.formatted_final_amount }}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                            {% else %}
                             <div class="text-center py-5 text-muted">
                                 <i class="bi bi-bag-x fs-1 d-block mb-3 opacity-50"></i>
                                 <h6 class="fw-bold text-dark mb-1">아직 주문 내역이 없습니다.</h6>
@@ -208,6 +240,7 @@
                                     상품 둘러보기
                                 </a>
                             </div>
+                            {% endif %}
                         </div>
 
                         <!-- 탭 3: 환불 내역 -->
@@ -267,9 +300,9 @@
                 </div>
                 {% if cart_items %}
                 <div class="mt-3">
-                    <button type="button" class="btn btn-dark w-100 py-2 fw-bold rounded-pill shadow-sm" onclick="openCheckoutModal()">
+                    <a href="{{ url_for('main.order_checkout') }}" class="btn btn-dark w-100 py-2 fw-bold rounded-pill shadow-sm text-decoration-none text-center d-block">
                         <i class="bi bi-credit-card me-1"></i> 장바구니 상품 전체 구매하기
-                    </button>
+                    </a>
                 </div>
                 {% endif %}
             </div>

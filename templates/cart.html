@@ -18,10 +18,10 @@
     {% endif %}
 
     <!-- 품절 상품 포함 시 상단 경고 안내 문구 -->
-    <div class="alert alert-danger d-flex align-items-center rounded-3 p-3 mb-4 {% if not has_sold_out_items %}d-none{% endif %}" id="soldOutTopAlert">
+    <div class="alert alert-danger d-flex align-items-center rounded-3 p-3 mb-4 {% if not has_sold_out_items and not (request.args.get('error') in ['sold_out', 'sold_out_included']) %}d-none{% endif %}" id="soldOutTopAlert">
         <i class="bi bi-exclamation-octagon-fill text-danger me-2 fs-5"></i>
         <div>
-            <strong>주문 불가 안내:</strong> 품절된 상품이 포함되어 있어 주문할 수 없습니다. 품절 상품을 삭제해 주세요.
+            <strong>주문 불가 안내:</strong> 품절된 상품이 있어 주문할 수 없습니다.
         </div>
     </div>
 
@@ -396,13 +396,13 @@
         }
     }
 
-    // checkout 쿼리스트링 존재 시 주문 결제 모달 자동 오픈 지원
+    // checkout 쿼리스트링 존재 시 주문서 작성 페이지(/order/checkout)로 자동 이동 지원
     document.addEventListener('DOMContentLoaded', function() {
         const urlParams = new URLSearchParams(window.location.search);
         if (urlParams.get('checkout') === '1') {
             const soldOutItems = document.querySelectorAll('.cart-item-row[data-is-sold-out="true"]');
-            if (soldOutItems.length === 0 && typeof openCheckoutModal === 'function') {
-                openCheckoutModal();
+            if (soldOutItems.length === 0) {
+                window.location.href = '/order/checkout';
             }
         }
     });

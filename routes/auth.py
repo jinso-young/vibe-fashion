@@ -1195,6 +1195,50 @@ def mypage():
     except Exception as e:
         logger.warning(f"마이페이지 장바구니 조회 경고: {e}")
 
+    # 4. 마이페이지 주문 내역 조회
+    user_orders = []
+    try:
+        order_client = admin_client or supabase
+        if order_client and user_id:
+            ord_resp = order_client.table("orders")\
+                .select("*, order_items(*)")\
+                .eq("user_id", user_id)\
+                .order("created_at", desc=True)\
+                .execute()
+            if ord_resp.data:
+                for ord_item in ord_resp.data:
+                    final_amt = int(ord_item.get("final_amount") or 0)
+                    created_str = ord_item.get("created_at") or ""
+                    try:
+                        from datetime import datetime
+                        dt = datetime.fromisoformat(created_str.replace("Z", "+00:00"))
+                        created_formatted = dt.strftime("%Y.%m.%d %H:%M")
+                    except Exception:
+                        created_formatted = created_str
+
+                    status_map = {
+                        "paid": "결제완료",
+                        "shipping": "배송중",
+                        "delivered": "배송완료",
+                        "completed": "구매확정",
+                        "cancelled": "주문취소",
+                        "pending": "결제대기"
+                    }
+
+                    user_orders.append({
+                        "order_number": ord_item.get("order_number"),
+                        "status": ord_item.get("status"),
+                        "status_badge": status_map.get(ord_item.get("status"), ord_item.get("status")),
+                        "final_amount": final_amt,
+                        "formatted_final_amount": f"{final_amt:,}원",
+                        "recipient_name": ord_item.get("recipient_name"),
+                        "shipping_address": ord_item.get("shipping_address"),
+                        "created_at": created_formatted,
+                        "order_items": ord_item.get("order_items") or []
+                    })
+    except Exception as oe:
+        logger.warning(f"마이페이지 주문 목록 조회 경고: {oe}")
+
     return render_template(
         "auth/mypage.html",
         user=user,
@@ -1202,7 +1246,8 @@ def mypage():
         success_message=success_msg,
         cart_items=cart_items,
         cart_total=cart_total,
-        formatted_cart_total=f"{cart_total:,}원"
+        formatted_cart_total=f"{cart_total:,}원",
+        orders=user_orders
     )
 
 

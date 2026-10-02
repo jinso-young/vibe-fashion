@@ -244,30 +244,10 @@ function buyNow(name, price, imageUrl) {
 }
 
 /**
- * 결제 모달(주문서 작성창) 열기 - 장바구니 전체
+ * 결제 모달(주문서 작성창) 열기 - 실제 주문서 페이지(/order/checkout)로 이동
  */
 function openCheckoutModal() {
-    // 1. 로그인 여부 확인
-    if (typeof window.IS_LOGGED_IN !== 'undefined' && !window.IS_LOGGED_IN) {
-        const loginModalEl = document.getElementById('loginRequiredModal');
-        if (loginModalEl && typeof bootstrap !== 'undefined') {
-            const loginModal = bootstrap.Modal.getOrCreateInstance(loginModalEl);
-            loginModal.show();
-            return;
-        } else {
-            alert('로그인이 필요한 서비스입니다.');
-            window.location.href = window.LOGIN_URL || '/auth/login';
-            return;
-        }
-    }
-
-    // 2. 장바구니 비어있는지 확인
-    if (!cartState || cartState.length === 0) {
-        alert('장바구니에 담긴 상품이 없습니다.');
-        return;
-    }
-
-    openCheckoutModalWithItems(cartState, false);
+    window.location.href = '/order/checkout';
 }
 
 let currentCheckoutItems = [];
@@ -325,66 +305,48 @@ function openCheckoutModalWithItems(items, isSingle) {
 }
 
 /**
- * 실제 결제 처리 함수 (결제 승인 및 주문 완료 처리)
+ * 실제 결제 처리 함수 (결제 승인 및 서버 주문 저장 처리)
  */
-function processPayment() {
+async function processPayment() {
     const recipient = document.getElementById('checkoutRecipient')?.value.trim();
     const phone = document.getElementById('checkoutPhone')?.value.trim();
     const address = document.getElementById('checkoutAddress')?.value.trim();
+    const addressDetail = document.getElementById('checkoutAddressDetail')?.value.trim() || '';
+    const memo = document.getElementById('checkoutDeliveryMemo')?.value.trim() || '';
 
     if (!recipient || !phone || !address) {
         alert('배송지 정보(수령인, 연락처, 주소)를 모두 입력해주세요.');
         return;
     }
 
-    const selectedPayMethod = document.querySelector('input[name="paymentMethod"]:checked')?.value || 'kakaopay';
-    const payNames = {
-        'kakaopay': '카카오페이',
-        'naverpay': '네이버페이',
-        'credit_card': '신용카드'
-    };
-    const payName = payNames[selectedPayMethod] || '간편결제';
+    try {
+        const resp = await fetch('/order/checkout', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            },
+            body: JSON.stringify({
+                recipient_name: recipient,
+                recipient_phone: phone,
+                shipping_address: address,
+                shipping_address_detail: addressDetail,
+                delivery_memo: memo
+            })
+        });
 
-    let total = 0;
-    currentCheckoutItems.forEach(item => {
-        total += parsePrice(item.price) * (Number(item.quantity) || 1);
-    });
-
-    // 주문 번호 생성 (ORD-YYYYMMDD-랜덤)
-    const now = new Date();
-    const dateStr = now.getFullYear().toString() +
-                    String(now.getMonth() + 1).padStart(2, '0') +
-                    String(now.getDate()).padStart(2, '0');
-    const randomStr = Math.floor(1000 + Math.random() * 9000);
-    const orderNumber = `ORD-${dateStr}-${randomStr}`;
-
-    // 주문서 모달 닫기
-    const checkoutModalEl = document.getElementById('checkoutModal');
-    if (checkoutModalEl && typeof bootstrap !== 'undefined') {
-        const modal = bootstrap.Modal.getInstance(checkoutModalEl);
-        if (modal) modal.hide();
-    }
-
-    // 장바구니 전체 결제였던 경우 장바구니 비우기
-    if (!isDirectBuyNow) {
-        cartState.length = 0;
-        saveCartToStorage();
-        updateCartUI();
-        renderMypageCartSection();
-    }
-
-    // 주문 완료 축하 모달 세팅 및 표시
-    const orderNumEl = document.getElementById('orderSuccessNumber');
-    const orderAmtEl = document.getElementById('orderSuccessAmount');
-    if (orderNumEl) orderNumEl.textContent = `${orderNumber} (${payName})`;
-    if (orderAmtEl) orderAmtEl.textContent = total.toLocaleString() + '원';
-
-    const orderModalEl = document.getElementById('orderSuccessModal');
-    if (orderModalEl && typeof bootstrap !== 'undefined') {
-        const orderModal = bootstrap.Modal.getOrCreateInstance(orderModalEl);
-        orderModal.show();
-    } else {
-        alert(`주문 및 결제가 정상 완료되었습니다!\n주문번호: ${orderNumber}\n결제수단: ${payName}\n결제금액: ${total.toLocaleString()}원`);
+        const data = await resp.json();
+        if (data.success && data.redirect_url) {
+            window.location.href = data.redirect_url;
+        } else {
+            alert(data.message || '주문 처리에 실패했습니다.');
+            if (data.redirect_url) {
+                window.location.href = data.redirect_url;
+            }
+        }
+    } catch (err) {
+        console.error('결제 처리 오류:', err);
+        window.location.href = '/order/checkout';
     }
 }
 

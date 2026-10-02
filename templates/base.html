@@ -267,9 +267,9 @@
                     <span class="fw-bold">총 결제금액:</span>
                     <span id="cart-total-price" class="fs-5 fw-bold text-danger">0원</span>
                 </div>
-                <button class="btn btn-dark w-100 py-2 fw-bold" onclick="openCheckoutModal()">
+                <a href="{{ url_for('main.order_checkout') }}" class="btn btn-dark w-100 py-2 fw-bold text-decoration-none text-center d-block">
                     <i class="bi bi-credit-card me-1"></i> 구매 및 결제하기
-                </button>
+                </a>
             </div>
         </div>
     </div>

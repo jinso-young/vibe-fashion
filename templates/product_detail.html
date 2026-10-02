@@ -371,13 +371,51 @@
         }
     }
 
-    // 상세 페이지 바로 구매하기
-    function handleDetailBuyNow() {
+    // 상세 페이지 바로 구매하기 (장바구니 담기 후 주문서 페이지로 즉시 이동)
+    async function handleDetailBuyNow() {
         const opt = getSelectedOptionDetails();
         if (!opt) return;
 
-        // 단일 상품 바로 주문서 오픈
-        buyNow(opt.fullName, PRODUCT_PRICE * opt.quantity, PRODUCT_IMAGE);
+        const buyBtn = document.getElementById('buyNowBtn');
+        if (buyBtn) {
+            buyBtn.disabled = true;
+            buyBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status"></span>주문서 이동 중...';
+        }
+
+        try {
+            const resp = await fetch('/cart/add', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                },
+                body: JSON.stringify({
+                    product_option_id: opt.id,
+                    quantity: opt.quantity
+                })
+            });
+
+            const data = await resp.json();
+
+            if (resp.status === 401) {
+                alert('로그인이 필요한 서비스입니다.');
+                window.location.href = '/auth/login?error=login_required';
+                return;
+            }
+
+            if (resp.ok && data.success) {
+                window.location.href = '/order/checkout';
+            } else {
+                alert(data.message || '구매 처리를 진행할 수 없습니다.');
+                if (buyBtn) {
+                    buyBtn.disabled = false;
+                    buyBtn.innerHTML = '바로 구매하기';
+                }
+            }
+        } catch (error) {
+            console.error('바로 구매 처리 오류:', error);
+            window.location.href = '/order/checkout';
+        }
     }
 
     // 페이지 로드 후 첫 색상의 사이즈 자동 로드
