@@ -193,6 +193,19 @@ def profile():
 # 2. 관리자 메인 대시보드
 # =====================================================
 @admin_bp.route("")
+def admin_root():
+    """
+    /admin 직접 입력 접근 완전 방지
+    - 특정 URL(/admin)을 직접 입력하는 것만으로 대시보드가 표시되거나 공식 진입 경로로 사용되는 것을 금지
+    - 공식 진입 경로는 쇼핑몰 로그인 화면의 「관리자 로그인」 버튼을 통해 접근하는 구조임
+    - 미인증 상태에서 /admin을 직접 입력 시 관리자 데이터나 대시보드를 일체 표시하지 않고 쇼핑몰 로그인 화면으로 안전하게 안내
+    """
+    if session.get("admin_id") and session.get("admin_role"):
+        return redirect(url_for("admin.dashboard"))
+    # 공식 진입 경로인 일반 회원 로그인 화면으로 이동
+    return redirect(url_for("auth.login"))
+
+
 @admin_bp.route("/dashboard")
 @admin_login_required
 @admin_permission_required("dashboard_view")
