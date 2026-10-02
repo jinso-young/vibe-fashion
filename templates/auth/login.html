@@ -64,14 +64,14 @@
                     <!-- 구분선 -->
                     <div class="position-relative text-center my-4">
                         <hr class="text-muted opacity-25">
-                        <span class="position-absolute top-50 start-50 translate-middle bg-white px-3 text-muted text-xs">또는 이메일 로그인</span>
+                        <span class="position-absolute top-50 start-50 translate-middle bg-white px-3 text-muted text-xs">아이디 로그인</span>
                     </div>
 
-                    <!-- 일반 이메일 로그인 폼 -->
+                    <!-- 회원과 관리자가 함께 사용하는 로그인 폼 -->
                     <form method="POST" action="{{ url_for('auth.login') }}">
                         <div class="mb-3">
-                            <label for="email" class="form-label small fw-bold">이메일 주소</label>
-                            <input type="email" class="form-control form-control-lg rounded-3 fs-6" id="email" name="email" value="{{ email or '' }}" placeholder="example@email.com" required>
+                            <label for="identifier" class="form-label small fw-bold">아이디</label>
+                            <input type="text" class="form-control form-control-lg rounded-3 fs-6" id="identifier" name="identifier" value="{{ email or '' }}" placeholder="아이디 또는 이메일" required autocomplete="username">
                         </div>
                         <div class="mb-3">
                             <div class="d-flex justify-content-between align-items-center">
@@ -101,12 +101,6 @@
                         </a>
                     </div>
 
-                    <!-- 관리자 로그인 버튼 (작은 텍스트 형태) -->
-                    <div class="text-center mt-4 pt-2">
-                        <a href="{{ url_for('admin.login') }}" class="text-muted small text-decoration-none" style="font-size: 0.78rem; opacity: 0.65;">
-                            관리자 로그인
-                        </a>
-                    </div>
                 </div>
             </div>
         </div>

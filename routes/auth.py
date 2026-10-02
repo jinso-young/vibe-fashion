@@ -17,11 +17,13 @@ import smtplib
 import urllib.request
 import urllib.parse
 import urllib.error
+from datetime import datetime, timezone
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from functools import wraps
 from flask import Blueprint, render_template, request, redirect, url_for, session, current_app
 from supabase import create_client, Client
+from services.admin_service import authenticate_admin, get_admin_by_username
 
 logger = logging.getLogger(__name__)
 
@@ -33,8 +35,9 @@ auth_bp = Blueprint("auth", __name__)
 AUTH_MESSAGES = {
     # 에러 메시지
     "email_not_confirmed": "이메일 인증이 완료되지 않았습니다. 메일함의 인증 링크를 클릭하여 인증을 완료해주세요.",
-    "invalid_credentials": "이메일 또는 비밀번호가 올바르지 않습니다.",
+    "invalid_credentials": "아이디 또는 비밀번호가 올바르지 않습니다.",
     "login_required": "로그인이 필요한 서비스입니다.",
+    "session_expired": "보안을 위해 관리자 세션이 만료되었습니다. 다시 로그인해주세요.",
     "user_exists": "이미 가입된 이메일 계정입니다. 로그인해주세요.",
     "password_mismatch": "비밀번호와 비밀번호 확인이 일치하지 않습니다.",
     "password_too_short": "비밀번호는 최소 6자 이상이어야 합니다.",
@@ -316,6 +319,9 @@ def login():
     로그인 폼 표시 및 로그인 요청을 처리합니다.
     - 이메일 미인증 상태일 경우 error=email_not_confirmed 파라미터와 함께 리다이렉트합니다.
     """
+    if session.get("admin_id"):
+        return redirect(url_for("admin.dashboard"))
+
     user_id = session.get("user_id")
     if user_id:
         supabase = get_supabase_client()
@@ -330,16 +336,36 @@ def login():
             except Exception:
                 pass
         if user_exists:
-            return redirect(url_for("auth.mypage"))
+            return redirect(url_for("main.index"))
         else:
             session.clear()
 
     if request.method == "POST":
-        email = request.form.get("email", "").strip()
+        email = (request.form.get("identifier") or request.form.get("email", "")).strip()
         password = request.form.get("password", "").strip()
 
         if not email or not password:
             return redirect(url_for("auth.login", error="missing_fields", email=email))
+
+        # 관리자 ID가 실제로 존재할 때만 관리자 인증을 시도해 회원 로그인 실패를
+        # 관리자 로그인 실패 기록으로 처리하지 않습니다.
+        admin_candidate = get_admin_by_username(email)
+        if admin_candidate:
+            admin, _ = authenticate_admin(
+                email,
+                password,
+                ip_address=request.headers.get("X-Forwarded-For", request.remote_addr)
+            )
+            if not admin:
+                return redirect(url_for("auth.login", error="invalid_credentials", email=email))
+
+            session.clear()
+            session["admin_id"] = admin["id"]
+            session["admin_username"] = admin["username"]
+            session["admin_name"] = admin["name"]
+            session["admin_role"] = admin["role"]
+            session["admin_last_activity"] = datetime.now(timezone.utc).timestamp()
+            return redirect(url_for("admin.dashboard"))
 
         supabase = get_supabase_client()
         if not supabase:
@@ -353,9 +379,10 @@ def login():
                 "role": "customer",
                 "provider": "email"
             }
+            session.clear()
             session["user_id"] = user_id
             session["user"] = user_data
-            return redirect(url_for("auth.mypage"))
+            return redirect(url_for("main.index"))
 
         try:
             resp = supabase.auth.sign_in_with_password({
@@ -403,13 +430,14 @@ def login():
                 logger.warning(f"프로필 동기화 경고: {pe}")
 
             # Flask session에 user_id 및 user 정보 저장
+            session.clear()
             session["user_id"] = user_id
             session["user"] = user_data
             if auth_session and hasattr(auth_session, "access_token") and auth_session.access_token:
                 session["access_token"] = auth_session.access_token
                 session["refresh_token"] = getattr(auth_session, "refresh_token", None)
 
-            return redirect(url_for("auth.mypage"))
+            return redirect(url_for("main.index"))
 
         except Exception as e:
             logger.error(f"로그인 처리 실패: {e}")

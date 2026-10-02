@@ -804,7 +804,7 @@ def admin_login_required(view_func):
         if not admin_id:
             # 원래 요청하려던 경로를 next로 전달
             next_url = request.full_path if request.query_string else request.path
-            return redirect(url_for("admin.login", next=next_url))
+            return redirect(url_for("auth.login", next=next_url))
 
         # 세션 비활동 만료 검사
         now_ts = datetime.now(timezone.utc).timestamp()
@@ -816,7 +816,7 @@ def admin_login_required(view_func):
             session.pop("admin_role", None)
             session.pop("admin_name", None)
             session.pop("admin_last_activity", None)
-            return redirect(url_for("admin.login", error="session_expired"))
+            return redirect(url_for("auth.login", error="session_expired"))
 
         # 최신 활동 시간 갱신
         session["admin_last_activity"] = now_ts
@@ -829,7 +829,7 @@ def admin_login_required(view_func):
             session.pop("admin_role", None)
             session.pop("admin_name", None)
             session.pop("admin_last_activity", None)
-            return redirect(url_for("admin.login", error="invalid_credentials"))
+            return redirect(url_for("auth.login", error="invalid_credentials"))
 
         # 최신 권한 정보를 session에 최신화
         session["admin_role"] = admin["role"]
@@ -845,7 +845,7 @@ def admin_permission_required(permission_code: str):
         def wrapper(*args, **kwargs):
             admin_id = session.get("admin_id")
             if not admin_id:
-                return redirect(url_for("admin.login", next=request.path))
+                return redirect(url_for("auth.login", next=request.path))
 
             role = session.get("admin_role", "")
             if not has_admin_permission(role, permission_code):
@@ -866,7 +866,7 @@ def admin_role_required(allowed_roles: list[str]):
         def wrapper(*args, **kwargs):
             admin_id = session.get("admin_id")
             if not admin_id:
-                return redirect(url_for("admin.login", next=request.path))
+                return redirect(url_for("auth.login", next=request.path))
 
             role = session.get("admin_role", "")
             if role not in allowed_roles:

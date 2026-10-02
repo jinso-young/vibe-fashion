@@ -28,7 +28,7 @@ from flask import (
 from routes.auth import get_supabase_admin_client
 from services.admin_service import (
     ROLES, PERMISSIONS, has_admin_permission,
-    authenticate_admin, get_admin_by_id, list_admins,
+    get_admin_by_id, list_admins,
     create_admin, update_admin, toggle_admin_status,
     delete_admin, reset_admin_password, change_own_password,
     verify_admin_password, validate_password_complexity,
@@ -87,56 +87,8 @@ def inject_admin_context():
 # =====================================================
 @admin_bp.route("/login", methods=["GET", "POST"])
 def login():
-    """
-    관리자 전용 로그인 페이지
-    - 아이디 또는 비밀번호 오류 시 모호한 에러 메시지(「아이디 또는 비밀번호가 일치하지 않습니다.」) 표시
-    - 로그인 잠금(브루트포스 차단) 적용
-    - 세션 만료 시 친절한 안내 제공
-    """
-    # 이미 관리자로 정상 로그인되어 있다면 대시보드로 이동
-    if session.get("admin_id") and session.get("admin_role"):
-        return redirect(url_for("admin.dashboard"))
-
-    error_msg = None
-    if request.args.get("error") == "session_expired":
-        error_msg = "보안을 위해 일정 시간 동안 활동이 없어 세션이 만료되었습니다. 다시 로그인해주세요."
-    elif request.args.get("error") == "password_changed":
-        flash("관리자 비밀번호가 변경되었습니다. 보안을 위해 다시 로그인해주세요.", "success")
-    elif request.args.get("error") == "login_required":
-        error_msg = "관리자 로그인이 필요한 서비스입니다."
-    elif request.args.get("error") == "invalid_credentials":
-        error_msg = "아이디 또는 비밀번호가 일치하지 않습니다."
-
-    next_url = request.args.get("next") or request.form.get("next") or url_for("admin.dashboard")
-
-    if request.method == "POST":
-        username = request.form.get("username", "").strip()
-        password = request.form.get("password", "").strip()
-
-        if not username or not password:
-            error_msg = "아이디 또는 비밀번호가 일치하지 않습니다."
-        else:
-            ip_addr = request.headers.get("X-Forwarded-For", request.remote_addr)
-            admin, err = authenticate_admin(username, password, ip_address=ip_addr)
-            if err:
-                error_msg = err
-            else:
-                # 관리자 전용 세션 저장 및 비활동 타임스탬프 설정
-                session["admin_id"] = admin["id"]
-                session["admin_username"] = admin["username"]
-                session["admin_name"] = admin["name"]
-                session["admin_role"] = admin["role"]
-                session["admin_last_activity"] = datetime.now(timezone.utc).timestamp()
-
-                # 비밀번호 변경이 필요한 경우 알림
-                if admin.get("must_change_password"):
-                    flash("임시 비밀번호로 로그인하셨습니다. 보안을 위해 즉시 비밀번호를 변경해주세요.", "warning")
-                    return redirect(url_for("admin.profile"))
-
-                flash(f"환영합니다, {admin['name']}님 ({ROLES.get(admin['role'])})", "success")
-                return redirect(next_url)
-
-    return render_template("admin/login.html", error=error_msg, next=next_url)
+    """기존 관리자 로그인 경로를 공통 쇼핑몰 로그인 화면으로 연결합니다."""
+    return redirect(url_for("auth.login", **request.args))
 
 
 @admin_bp.route("/logout")
@@ -158,8 +110,8 @@ def logout():
     session.pop("admin_name", None)
     session.pop("admin_role", None)
 
-    flash("관리자 시스템에서 안전하게 로그아웃되었습니다.", "info")
-    return redirect(url_for("main.index"))
+    session.clear()
+    return redirect(url_for("auth.login", success="logged_out"))
 
 
 @admin_bp.route("/profile", methods=["GET", "POST"])
@@ -190,7 +142,7 @@ def profile():
                 session.pop("admin_role", None)
                 session.pop("admin_last_activity", None)
 
-                return redirect(url_for("admin.login", error="password_changed"))
+                return redirect(url_for("auth.login", error="password_changed"))
             else:
                 if isinstance(err_or_errors, list):
                     error_list = err_or_errors
