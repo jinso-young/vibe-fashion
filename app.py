@@ -62,11 +62,18 @@ def create_app(config_override=None):
     app.register_blueprint(auth_bp)
     app.register_blueprint(admin_bp)
 
-    # 404 에러 핸들러 (사용자가 잘못된 경로로 접근했을 때 친절한 안내)
+    # 404 에러 핸들러 (사용자가 잘못된 경로 또는 기존 /admin으로 접근했을 때 안내)
     @app.errorhandler(404)
     def page_not_found(error):
         from flask import render_template
         return render_template("404.html"), 404
+
+    # 이전의 /admin 및 하위 경로 직접 접근 시 완전 차단 (쇼핑몰 로그인으로 리다이렉트)
+    @app.route("/admin", defaults={"subpath": ""})
+    @app.route("/admin/<path:subpath>")
+    def block_legacy_admin(subpath):
+        from flask import redirect, url_for
+        return redirect(url_for("auth.login"))
 
     return app
 

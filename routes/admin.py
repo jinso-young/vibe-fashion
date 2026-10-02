@@ -39,8 +39,19 @@ from services.admin_service import (
 
 logger = logging.getLogger(__name__)
 
-# 관리자 전용 블루프린트 (URL 접두어: /admin)
-admin_bp = Blueprint("admin", __name__, url_prefix="/admin")
+# =====================================================
+# 관리자 URL 접두어 보안 암호화/난독화 (Security Token Path)
+# 기본값: /manage-x7k9q2m (난독화된 보안 경로)
+# .env의 ADMIN_URL_PREFIX 환경변수를 통해 변경 가능하며,
+# /admin 같은 뻔한 관리자 URL 노출을 원천 방지합니다.
+# =====================================================
+DEFAULT_ADMIN_PREFIX = "/manage-x7k9q2m"
+ADMIN_URL_PREFIX = os.getenv("ADMIN_URL_PREFIX", DEFAULT_ADMIN_PREFIX).strip()
+if not ADMIN_URL_PREFIX.startswith("/"):
+    ADMIN_URL_PREFIX = "/" + ADMIN_URL_PREFIX
+
+# 관리자 전용 블루프린트 (동적 난독화 접두어 등록)
+admin_bp = Blueprint("admin", __name__, url_prefix=ADMIN_URL_PREFIX)
 
 
 # =====================================================
@@ -195,10 +206,9 @@ def profile():
 @admin_bp.route("")
 def admin_root():
     """
-    /admin 직접 입력 접근 완전 방지
-    - 특정 URL(/admin)을 직접 입력하는 것만으로 대시보드가 표시되거나 공식 진입 경로로 사용되는 것을 금지
-    - 공식 진입 경로는 쇼핑몰 로그인 화면의 「관리자 로그인」 버튼을 통해 접근하는 구조임
-    - 미인증 상태에서 /admin을 직접 입력 시 관리자 데이터나 대시보드를 일체 표시하지 않고 쇼핑몰 로그인 화면으로 안전하게 안내
+    관리자 기본 루트 접근 제어
+    - 로그인 인증이 완료된 관리자만 대시보드로 이동
+    - 미인증 상태에서 관리자 URL을 직접 입력 시 일반 회원 로그인 화면으로 이동
     """
     if session.get("admin_id") and session.get("admin_role"):
         return redirect(url_for("admin.dashboard"))
