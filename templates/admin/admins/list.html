@@ -87,15 +87,10 @@
                                     </form>
 
                                     <!-- 삭제 버튼 -->
-                                    <form method="POST" action="{{ url_for('admin.admin_remove', admin_id=a.id) }}" class="d-inline"
-                                          data-confirm="정말 관리자({{ a.username }}) 계정을 삭제하시겠습니까? 삭제된 관리자는 시스템에 더 이상 로그인할 수 없습니다."
-                                          data-confirm-title="관리자 계정 삭제 확인"
-                                          data-confirm-btn="삭제"
-                                          data-confirm-btn-class="btn-danger">
-                                        <button type="submit" class="btn btn-outline-danger" title="계정 삭제">
-                                            <i class="bi bi-trash"></i>
-                                        </button>
-                                    </form>
+                                    <button type="button" class="btn btn-outline-danger" title="계정 삭제"
+                                            data-bs-toggle="modal" data-bs-target="#deleteAdminModal{{ a.id }}">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
                                 {% else %}
                                     <button type="button" class="btn btn-outline-secondary disabled" title="본인 계정은 상태 변경 및 삭제가 불가합니다">
                                         <i class="bi bi-shield-check"></i>
@@ -104,6 +99,38 @@
                             </div>
                         </td>
                     </tr>
+
+                    <!-- 관리자 계정 삭제 모달 (현재 비밀번호 재인증) -->
+                    <div class="modal fade" id="deleteAdminModal{{ a.id }}" tabindex="-1" aria-hidden="true">
+                        <div class="modal-dialog modal-dialog-centered">
+                            <div class="modal-content border-0 shadow">
+                                <form method="POST" action="{{ url_for('admin.admin_remove', admin_id=a.id) }}"
+                                      data-confirm="정말 관리자({{ a.username }}) 계정을 삭제하시겠습니까? 삭제된 관리자는 복구할 수 없습니다."
+                                      data-confirm-title="관리자 계정 삭제 확인"
+                                      data-confirm-btn="삭제 실행"
+                                      data-confirm-btn-class="btn-danger">
+                                    <div class="modal-header bg-danger text-white">
+                                        <h5 class="modal-title fw-bold"><i class="bi bi-exclamation-triangle-fill me-2"></i>관리자 계정 영구 삭제 ({{ a.username }})</h5>
+                                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                                    </div>
+                                    <div class="modal-body">
+                                        <p class="text-secondary small mb-3">
+                                            계정(<strong>{{ a.username }} - {{ a.name }}</strong>)을 삭제하면 즉시 로그인이 차단되며 시스템 권한이 회수됩니다.<br>
+                                            보안을 위해 <strong>현재 로그인 중인 최고 관리자 비밀번호</strong>를 입력해주세요.
+                                        </p>
+                                        <div class="mb-3">
+                                            <label class="form-label small fw-semibold text-secondary">최고 관리자 본인 비밀번호 확인 <span class="text-danger">*</span></label>
+                                            <input type="password" class="form-control" name="auth_password" placeholder="현재 비밀번호 입력" required autocomplete="current-password">
+                                        </div>
+                                    </div>
+                                    <div class="modal-footer">
+                                        <button type="button" class="btn btn-light" data-bs-dismiss="modal">취소</button>
+                                        <button type="submit" class="btn btn-danger px-4">계정 삭제</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
 
                     <!-- 관리자 정보 수정 모달 -->
                     <div class="modal fade" id="editAdminModal{{ a.id }}" tabindex="-1" aria-hidden="true">
@@ -154,6 +181,10 @@
                                             <input type="hidden" name="status" value="{{ a.status }}">
                                             {% endif %}
                                         </div>
+                                        <div class="mb-3 pt-2 border-top">
+                                            <label class="form-label small fw-semibold text-secondary">최고 관리자 본인 비밀번호 확인 <span class="text-danger">*</span></label>
+                                            <input type="password" class="form-control" name="auth_password" placeholder="권한 변경 승인을 위해 현재 비밀번호 입력" required autocomplete="current-password">
+                                        </div>
                                     </div>
                                     <div class="modal-footer">
                                         <button type="button" class="btn btn-light" data-bs-dismiss="modal">취소</button>
@@ -179,17 +210,21 @@
                                     </div>
                                     <div class="modal-body">
                                         <p class="text-secondary small mb-3">
-                                            해당 관리자에게 전달할 새 임시 비밀번호를 입력해주세요.
+                                            해당 관리자에게 전달할 새 임시 비밀번호를 입력해주세요. (최소 12자 이상, 대소문자/숫자/특수문자 조합)
                                         </p>
                                         <div class="mb-3">
-                                            <label class="form-label small fw-semibold text-secondary">새 임시 비밀번호 (최소 6자)</label>
-                                            <input type="password" class="form-control" name="new_password" minlength="6" placeholder="예: temp1234!" required>
+                                            <label class="form-label small fw-semibold text-secondary">새 임시 비밀번호 <span class="text-danger">*</span></label>
+                                            <input type="password" class="form-control" name="new_password" minlength="12" placeholder="12자 이상 복합 보안 비밀번호" required>
                                         </div>
-                                        <div class="form-check">
+                                        <div class="form-check mb-3">
                                             <input class="form-check-input" type="checkbox" name="must_change" id="must_change_{{ a.id }}" value="1" checked>
                                             <label class="form-check-label small" for="must_change_{{ a.id }}">
                                                 최초 로그인 시 비밀번호 변경 강제
                                             </label>
+                                        </div>
+                                        <div class="mb-3 pt-2 border-top">
+                                            <label class="form-label small fw-semibold text-secondary">최고 관리자 본인 비밀번호 확인 <span class="text-danger">*</span></label>
+                                            <input type="password" class="form-control" name="auth_password" placeholder="초기화 승인을 위해 현재 비밀번호 입력" required autocomplete="current-password">
                                         </div>
                                     </div>
                                     <div class="modal-footer">
@@ -231,7 +266,8 @@
                     </div>
                     <div class="mb-3">
                         <label class="form-label small fw-semibold text-secondary">초기 비밀번호 <span class="text-danger">*</span></label>
-                        <input type="password" class="form-control" name="password" minlength="6" placeholder="최소 6자 이상" required>
+                        <input type="password" class="form-control" name="password" minlength="12" maxlength="64" placeholder="12자 이상, 대소문자/숫자/특수문자 조합" required autocomplete="new-password">
+                        <div class="form-text small text-muted" style="font-size: 0.75rem;">12~64자, 대소문자/숫자/특수문자 포함 (공백/admin단어 불가)</div>
                     </div>
                     <div class="mb-3">
                         <label class="form-label small fw-semibold text-secondary">관리자 역할(권한) <span class="text-danger">*</span></label>
@@ -248,11 +284,15 @@
                             <option value="inactive">비활성 (접근 차단)</option>
                         </select>
                     </div>
-                    <div class="form-check">
+                    <div class="form-check mb-3">
                         <input class="form-check-input" type="checkbox" name="must_change_password" id="create_must_change" value="1" checked>
                         <label class="form-check-label small" for="create_must_change">
                             로그인 시 비밀번호 변경 강제
                         </label>
+                    </div>
+                    <div class="mb-3 pt-2 border-top">
+                        <label class="form-label small fw-semibold text-secondary">최고 관리자 본인 비밀번호 확인 <span class="text-danger">*</span></label>
+                        <input type="password" class="form-control" name="auth_password" placeholder="신규 계정 발급 승인을 위해 현재 비밀번호 입력" required autocomplete="current-password">
                     </div>
                 </div>
                 <div class="modal-footer">

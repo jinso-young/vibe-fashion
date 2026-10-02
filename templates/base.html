@@ -71,17 +71,6 @@
                         <span id="cart-badge" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-warning text-dark">0</span>
                     </a>
 
-                    <!-- 관리자 로그인 상태 버튼 (관리자에게만 노출) -->
-                    {% if session.get('admin_id') %}
-                    <div class="d-flex align-items-center me-1">
-                        <a href="{{ url_for('admin.dashboard') }}" class="btn btn-sm btn-danger rounded-pill px-3 fw-bold d-flex align-items-center gap-1 shadow-sm text-nowrap" style="font-size: 0.8rem; background: #dc2626; border-color: #dc2626;">
-                            <i class="bi bi-shield-lock-fill"></i>
-                            <span>관리자 콘솔</span>
-                            <span class="badge bg-white text-danger ms-1" style="font-size: 0.65rem;">{{ session.get('admin_role') }}</span>
-                        </a>
-                    </div>
-                    {% endif %}
-
                     <!-- 회원 메뉴 (로그인, 회원가입, 마이페이지) -->
                     <div class="d-flex align-items-center gap-1 border-start border-white border-opacity-25 ps-2 ps-md-3">
                         {% if session.get('user') %}
@@ -194,20 +183,6 @@
                 <div class="d-flex gap-3 align-items-center">
                     <a href="#" class="text-secondary text-decoration-none">이용약관</a>
                     <a href="#" class="text-secondary text-decoration-none fw-bold">개인정보처리방침</a>
-                    <span class="text-secondary opacity-50">|</span>
-                    {% if session.get('admin_id') %}
-                        <a href="{{ url_for('admin.dashboard') }}" class="text-warning text-decoration-none fw-semibold" title="관리자 콘솔 이동">
-                            <i class="bi bi-speedometer2 me-1"></i>관리자 콘솔 ({{ session.get('admin_name') }})
-                        </a>
-                        <span class="text-secondary opacity-50">|</span>
-                        <a href="{{ url_for('admin.logout') }}" class="text-danger text-decoration-none small" title="관리자 로그아웃">
-                            <i class="bi bi-box-arrow-right me-1"></i>관리자 로그아웃
-                        </a>
-                    {% else %}
-                        <a href="{{ url_for('admin.login') }}" class="text-secondary text-decoration-none" title="관리자 시스템 바로가기">
-                            <i class="bi bi-shield-lock me-1"></i>관리자 로그인
-                        </a>
-                    {% endif %}
                 </div>
             </div>
         </div>

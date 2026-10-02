@@ -31,6 +31,7 @@ from services.admin_service import (
     authenticate_admin, get_admin_by_id, list_admins,
     create_admin, update_admin, toggle_admin_status,
     delete_admin, reset_admin_password, change_own_password,
+    verify_admin_password, validate_password_complexity,
     log_admin_action, list_admin_logs,
     get_system_settings, update_system_setting,
     admin_login_required, admin_permission_required, admin_role_required
@@ -75,16 +76,25 @@ def inject_admin_context():
 # =====================================================
 @admin_bp.route("/login", methods=["GET", "POST"])
 def login():
-    """관리자 전용 로그인 페이지"""
-    # 이미 관리자로 로그인되어 있다면 대시보드로 이동
+    """
+    관리자 전용 로그인 페이지
+    - 아이디 또는 비밀번호 오류 시 모호한 에러 메시지(「아이디 또는 비밀번호가 일치하지 않습니다.」) 표시
+    - 로그인 잠금(브루트포스 차단) 적용
+    - 세션 만료 시 친절한 안내 제공
+    """
+    # 이미 관리자로 정상 로그인되어 있다면 대시보드로 이동
     if session.get("admin_id") and session.get("admin_role"):
         return redirect(url_for("admin.dashboard"))
 
     error_msg = None
-    if request.args.get("error") == "inactive_account":
-        error_msg = "계정이 비활성화되었거나 존재하지 않습니다."
+    if request.args.get("error") == "session_expired":
+        error_msg = "보안을 위해 일정 시간 동안 활동이 없어 세션이 만료되었습니다. 다시 로그인해주세요."
+    elif request.args.get("error") == "password_changed":
+        flash("관리자 비밀번호가 변경되었습니다. 보안을 위해 다시 로그인해주세요.", "success")
     elif request.args.get("error") == "login_required":
         error_msg = "관리자 로그인이 필요한 서비스입니다."
+    elif request.args.get("error") == "invalid_credentials":
+        error_msg = "아이디 또는 비밀번호가 일치하지 않습니다."
 
     next_url = request.args.get("next") or request.form.get("next") or url_for("admin.dashboard")
 
@@ -93,21 +103,23 @@ def login():
         password = request.form.get("password", "").strip()
 
         if not username or not password:
-            error_msg = "아이디와 비밀번호를 모두 입력해주세요."
+            error_msg = "아이디 또는 비밀번호가 일치하지 않습니다."
         else:
-            admin, err = authenticate_admin(username, password)
+            ip_addr = request.headers.get("X-Forwarded-For", request.remote_addr)
+            admin, err = authenticate_admin(username, password, ip_address=ip_addr)
             if err:
                 error_msg = err
             else:
-                # 관리자 전용 세션 저장
+                # 관리자 전용 세션 저장 및 비활동 타임스탬프 설정
                 session["admin_id"] = admin["id"]
                 session["admin_username"] = admin["username"]
                 session["admin_name"] = admin["name"]
                 session["admin_role"] = admin["role"]
+                session["admin_last_activity"] = datetime.now(timezone.utc).timestamp()
 
                 # 비밀번호 변경이 필요한 경우 알림
                 if admin.get("must_change_password"):
-                    flash("임시 비밀번호로 로그인하셨습니다. 보안을 위해 비밀번호를 변경해주세요.", "warning")
+                    flash("임시 비밀번호로 로그인하셨습니다. 보안을 위해 즉시 비밀번호를 변경해주세요.", "warning")
                     return redirect(url_for("admin.profile"))
 
                 flash(f"환영합니다, {admin['name']}님 ({ROLES.get(admin['role'])})", "success")
@@ -144,6 +156,7 @@ def logout():
 def profile():
     """관리자 본인 정보 조회 및 비밀번호 변경"""
     admin = get_admin_by_id(session["admin_id"])
+    error_list = []
     error_msg = None
     success_msg = None
 
@@ -156,16 +169,24 @@ def profile():
             error_msg = "모든 항목을 입력해주세요."
         elif new_pw != confirm_pw:
             error_msg = "새 비밀번호와 비밀번호 확인이 일치하지 않습니다."
-        elif len(new_pw) < 6:
-            error_msg = "비밀번호는 최소 6자 이상이어야 합니다."
         else:
-            success, err = change_own_password(session["admin_id"], current_pw, new_pw)
+            success, err_or_errors = change_own_password(session["admin_id"], current_pw, new_pw)
             if success:
-                success_msg = "비밀번호가 성공적으로 변경되었습니다."
-            else:
-                error_msg = err
+                # 비밀번호 변경 완료: 기존 관리자 세션 종료 및 로그인 화면 이동
+                session.pop("admin_id", None)
+                session.pop("admin_username", None)
+                session.pop("admin_name", None)
+                session.pop("admin_role", None)
+                session.pop("admin_last_activity", None)
 
-    return render_template("admin/profile.html", admin=admin, error=error_msg, success=success_msg)
+                return redirect(url_for("admin.login", error="password_changed"))
+            else:
+                if isinstance(err_or_errors, list):
+                    error_list = err_or_errors
+                else:
+                    error_msg = err_or_errors
+
+    return render_template("admin/profile.html", admin=admin, error=error_msg, error_list=error_list, success=success_msg)
 
 
 # =====================================================
@@ -1303,7 +1324,12 @@ def admins_list():
 @admin_login_required
 @admin_role_required(["SUPER_ADMIN"])
 def admin_create():
-    """관리자 계정 생성 (SUPER_ADMIN 전용)"""
+    """관리자 계정 생성 (SUPER_ADMIN 전용, 본인 비밀번호 재확인 필수)"""
+    auth_password = request.form.get("auth_password", "").strip()
+    if not auth_password or not verify_admin_password(session["admin_id"], auth_password):
+        flash("현재 관리자 비밀번호 확인에 실패했습니다. 올바른 비밀번호를 입력해주세요.", "danger")
+        return redirect(url_for("admin.admins_list"))
+
     username = request.form.get("username", "").strip()
     name = request.form.get("name", "").strip()
     email = request.form.get("email", "").strip()
@@ -1330,7 +1356,10 @@ def admin_create():
     )
 
     if err:
-        flash(err, "danger")
+        if isinstance(err, list):
+            flash("신규 관리자 비밀번호가 보안 규칙을 만족하지 않습니다: " + ", ".join(err), "danger")
+        else:
+            flash(err, "danger")
     else:
         flash(f"관리자 '{username}' ({name}) 계정이 성공적으로 생성되었습니다.", "success")
 
@@ -1341,7 +1370,12 @@ def admin_create():
 @admin_login_required
 @admin_role_required(["SUPER_ADMIN"])
 def admin_modify(admin_id: str):
-    """관리자 정보 및 권한 수정 (SUPER_ADMIN 전용)"""
+    """관리자 정보 및 권한 수정 (SUPER_ADMIN 전용, 본인 비밀번호 재확인 필수)"""
+    auth_password = request.form.get("auth_password", "").strip()
+    if not auth_password or not verify_admin_password(session["admin_id"], auth_password):
+        flash("현재 관리자 비밀번호 확인에 실패했습니다. 올바른 비밀번호를 입력해주세요.", "danger")
+        return redirect(url_for("admin.admins_list"))
+
     name = request.form.get("name", "").strip()
     email = request.form.get("email", "").strip()
     role = request.form.get("role", "STAFF").strip()
@@ -1363,7 +1397,7 @@ def admin_modify(admin_id: str):
     )
 
     if success:
-        flash("관리자 정보가 수정되었습니다.", "success")
+        flash("관리자 정보 및 권한이 수정되었습니다.", "success")
     else:
         flash(err or "수정에 실패했습니다.", "danger")
 
@@ -1396,7 +1430,12 @@ def admin_toggle_status(admin_id: str):
 @admin_login_required
 @admin_role_required(["SUPER_ADMIN"])
 def admin_reset_pw(admin_id: str):
-    """관리자 비밀번호 초기화 (SUPER_ADMIN 전용)"""
+    """관리자 비밀번호 초기화 (SUPER_ADMIN 전용, 본인 비밀번호 재확인 필수)"""
+    auth_password = request.form.get("auth_password", "").strip()
+    if not auth_password or not verify_admin_password(session["admin_id"], auth_password):
+        flash("현재 관리자 비밀번호 확인에 실패했습니다. 올바른 비밀번호를 입력해주세요.", "danger")
+        return redirect(url_for("admin.admins_list"))
+
     new_password = request.form.get("new_password", "").strip()
     must_change = bool(request.form.get("must_change", True))
 
@@ -1410,7 +1449,10 @@ def admin_reset_pw(admin_id: str):
     if success:
         flash("임시 비밀번호로 초기화되었습니다.", "success")
     else:
-        flash(err or "비밀번호 초기화 실패", "danger")
+        if isinstance(err, list):
+            flash("임시 비밀번호가 보안 규칙을 만족하지 않습니다: " + ", ".join(err), "danger")
+        else:
+            flash(err or "비밀번호 초기화 실패", "danger")
 
     return redirect(url_for("admin.admins_list"))
 
@@ -1419,7 +1461,12 @@ def admin_reset_pw(admin_id: str):
 @admin_login_required
 @admin_role_required(["SUPER_ADMIN"])
 def admin_remove(admin_id: str):
-    """관리자 계정 삭제 (SUPER_ADMIN 전용, 본인 계정 불가, 확인창 필수)"""
+    """관리자 계정 삭제 (SUPER_ADMIN 전용, 본인 계정 불가, 본인 비밀번호 재확인 필수)"""
+    auth_password = request.form.get("auth_password", "").strip()
+    if not auth_password or not verify_admin_password(session["admin_id"], auth_password):
+        flash("현재 관리자 비밀번호 확인에 실패했습니다. 올바른 비밀번호를 입력해주세요.", "danger")
+        return redirect(url_for("admin.admins_list"))
+
     operator_info = {
         "id": session.get("admin_id"),
         "username": session.get("admin_username"),
@@ -1457,7 +1504,7 @@ def logs_list():
 @admin_login_required
 @admin_role_required(["SUPER_ADMIN"])
 def settings_page():
-    """쇼핑몰 시스템 설정 (상호명, 고객센터, 배송비, 재고 부족 기준 등)"""
+    """쇼핑몰 시스템 설정 (상호명, 고객센터, 배송비, 재고 부족 기준 등, 본인 비밀번호 재확인 필수)"""
     operator_info = {
         "id": session.get("admin_id"),
         "username": session.get("admin_username"),
@@ -1465,6 +1512,11 @@ def settings_page():
     }
 
     if request.method == "POST":
+        auth_password = request.form.get("auth_password", "").strip()
+        if not auth_password or not verify_admin_password(session["admin_id"], auth_password):
+            flash("시스템 설정을 변경하려면 현재 관리자 비밀번호 확인이 필요합니다.", "danger")
+            return redirect(url_for("admin.settings_page"))
+
         settings_keys = [
             "shop_name", "company_name", "cs_phone", "cs_email",
             "low_stock_threshold", "free_shipping_min", "default_shipping_fee"

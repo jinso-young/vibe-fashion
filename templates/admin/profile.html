@@ -51,6 +51,16 @@
                         <i class="bi bi-exclamation-triangle-fill me-1"></i> {{ error }}
                     </div>
                 {% endif %}
+                {% if error_list %}
+                    <div class="alert alert-danger py-2 px-3 small mb-3">
+                        <div class="fw-bold mb-1"><i class="bi bi-exclamation-triangle-fill me-1"></i> 비밀번호 조건을 충족하지 않습니다.</div>
+                        <ul class="mb-0 ps-3">
+                            {% for err_item in error_list %}
+                            <li>{{ err_item }}</li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                {% endif %}
                 {% if success %}
                     <div class="alert alert-success py-2 px-3 small mb-3">
                         <i class="bi bi-check-circle-fill me-1"></i> {{ success }}
@@ -60,17 +70,20 @@
                 <form method="POST" action="{{ url_for('admin.profile') }}">
                     <div class="mb-3">
                         <label for="current_password" class="form-label small fw-semibold text-secondary">현재 비밀번호</label>
-                        <input type="password" class="form-control" id="current_password" name="current_password" required>
+                        <input type="password" class="form-control" id="current_password" name="current_password" required autocomplete="current-password">
                     </div>
 
                     <div class="mb-3">
-                        <label for="new_password" class="form-label small fw-semibold text-secondary">새 비밀번호 (최소 6자)</label>
-                        <input type="password" class="form-control" id="new_password" name="new_password" minlength="6" required>
+                        <label for="new_password" class="form-label small fw-semibold text-secondary">새 비밀번호</label>
+                        <input type="password" class="form-control" id="new_password" name="new_password" minlength="12" maxlength="64" required autocomplete="new-password">
+                        <div class="form-text small text-muted" style="font-size: 0.75rem;">
+                            12~64자, 영문 대소문자, 숫자, 특수문자 조합 (공백 및 ID/단순단어 불가)
+                        </div>
                     </div>
 
                     <div class="mb-4">
                         <label for="confirm_password" class="form-label small fw-semibold text-secondary">새 비밀번호 확인</label>
-                        <input type="password" class="form-control" id="confirm_password" name="confirm_password" minlength="6" required>
+                        <input type="password" class="form-control" id="confirm_password" name="confirm_password" minlength="12" maxlength="64" required autocomplete="new-password">
                     </div>
 
                     <div class="d-flex justify-content-end gap-2">

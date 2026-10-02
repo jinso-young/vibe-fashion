@@ -175,6 +175,123 @@ except Exception as e:
     logger.warning(f"SQLite 초기화 경고: {e}")
 
 
+# =====================================================
+# 로그인 실패 제한 (Rate Limiting / Brute-force 방지)
+# =====================================================
+MAX_LOGIN_FAILURES = 5
+LOCKOUT_MINUTES = 15
+
+# IP 및 username별 실패 기록: { key: [timestamp, ...] }
+_login_failures = {}
+
+
+def _get_failure_keys(username: str, ip_address: str | None) -> list[str]:
+    keys = []
+    if ip_address:
+        keys.append(f"ip:{ip_address}")
+    if username:
+        keys.append(f"user:{username.strip().lower()}")
+    return keys
+
+
+def is_login_locked(username: str, ip_address: str | None) -> tuple[bool, int]:
+    """
+    로그인 시도 제한 상태인지 확인.
+    잠금 상태인 경우 (True, 남은_대기_분) 반환.
+    """
+    now = datetime.now(timezone.utc)
+    keys = _get_failure_keys(username, ip_address)
+
+    for k in keys:
+        attempts = _login_failures.get(k, [])
+        # 만료된 시도(LOCKOUT_MINUTES 이전) 제거
+        recent_attempts = [t for t in attempts if (now - t).total_seconds() < LOCKOUT_MINUTES * 60]
+        _login_failures[k] = recent_attempts
+
+        if len(recent_attempts) >= MAX_LOGIN_FAILURES:
+            oldest = recent_attempts[0]
+            remaining_seconds = int((LOCKOUT_MINUTES * 60) - (now - oldest).total_seconds())
+            remaining_minutes = max(1, (remaining_seconds + 59) // 60)
+            return True, remaining_minutes
+
+    return False, 0
+
+
+def record_login_failure(username: str, ip_address: str | None):
+    """로그인 실패 타임스탬프 기록"""
+    now = datetime.now(timezone.utc)
+    keys = _get_failure_keys(username, ip_address)
+    for k in keys:
+        if k not in _login_failures:
+            _login_failures[k] = []
+        _login_failures[k].append(now)
+
+
+def clear_login_failures(username: str, ip_address: str | None):
+    """로그인 성공 시 실패 기록 초기화"""
+    keys = _get_failure_keys(username, ip_address)
+    for k in keys:
+        _login_failures.pop(k, None)
+
+
+# =====================================================
+# 관리자 비밀번호 보안 정책 검증
+# =====================================================
+DISALLOWED_WEAK_PASSWORDS = {
+    "123456789", "1234567890", "password", "admin123", "admin123!",
+    "administrator", "qwerty", "qwerty123", "admin1234!", "adminadmin"
+}
+
+
+def validate_password_complexity(password: str, username: str = None) -> tuple[bool, list[str]]:
+    """
+    관리자 새 비밀번호 보안 조건 검사:
+    - 최소 12자 이상, 최대 64자 이하
+    - 영문 대문자 1개 이상
+    - 영문 소문자 1개 이상
+    - 숫자 1개 이상
+    - 특수문자 1개 이상
+    - 공백 금지
+    - 약한 비밀번호 및 admin 관련 단어 금지
+    - username 포함 금지
+    - 동일 문자 3회 이상 연속 반복 금지
+    """
+    errors = []
+
+    if len(password) < 12:
+        errors.append("12자 이상 입력해주세요.")
+    if len(password) > 64:
+        errors.append("64자 이하로 입력해주세요.")
+
+    if " " in password:
+        errors.append("공백은 포함할 수 없습니다.")
+
+    import re
+    if not re.search(r"[A-Z]", password):
+        errors.append("영문 대문자를 1개 이상 포함해주세요.")
+    if not re.search(r"[a-z]", password):
+        errors.append("영문 소문자를 1개 이상 포함해주세요.")
+    if not re.search(r"[0-9]", password):
+        errors.append("숫자를 1개 이상 포함해주세요.")
+    if not re.search(r"[!@#$%^&*(),.?\":{}|<>_\-+=\[\]\\/'`~;]", password):
+        errors.append("특수문자를 1개 이상 포함해주세요.")
+
+    lower_pw = password.lower()
+    if lower_pw in DISALLOWED_WEAK_PASSWORDS:
+        errors.append("보안성이 취약하여 사용할 수 없는 비밀번호입니다.")
+
+    if "admin" in lower_pw or "administrator" in lower_pw:
+        errors.append("관리자와 관련된 단어('admin', 'administrator')는 포함할 수 없습니다.")
+
+    if username and len(username) >= 3 and username.lower() in lower_pw:
+        errors.append("관리자 ID를 포함하는 비밀번호는 사용할 수 없습니다.")
+
+    if re.search(r"(.)\1\1", password):
+        errors.append("동일한 문자가 3회 이상 연속으로 반복될 수 없습니다.")
+
+    return (len(errors) == 0), errors
+
+
 def _is_supabase_admin_table_ready() -> bool:
     """Supabase에 admin_users 테이블이 실존하는지 검사"""
     from routes.auth import get_supabase_admin_client
@@ -228,31 +345,47 @@ def list_admins() -> list[dict]:
 def authenticate_admin(username: str, password: str, ip_address: str = None) -> tuple[dict | None, str | None]:
     """
     관리자 로그인 인증 처리
-    성공 시 (admin_dict, None), 실패 시 (None, 에러메시지) 반환
+    보안 지침:
+    1. 로그인 실패 시 ID가 틀렸든 비밀번호가 틀렸든 동일한 모호한 에러 메시지 반환:
+       「아이디 또는 비밀번호가 일치하지 않습니다.」
+    2. 무차별 대입 공격(Brute-force) 방지: 반복 실패 시 잠금 안내
+    3. 실패 시 보안 감사 로그에 로그인 실패 기록
     """
-    admin = get_admin_by_username(username)
-    if not admin:
-        return None, "존재하지 않는 관리자 아이디입니다."
-
-    if admin.get("status") == "inactive":
-        return None, "비활성화된 관리자 계정입니다. 최고 관리자에게 문의하세요."
-    if admin.get("status") == "locked":
-        return None, "잠긴 관리자 계정입니다. 최고 관리자에게 문의하세요."
-
-    if not check_password_hash(admin.get("password_hash", ""), password):
+    locked, remaining_mins = is_login_locked(username, ip_address)
+    if locked:
         log_admin_action(
-            admin_id=admin.get("id"),
+            admin_id=None,
             username=username,
-            name=admin.get("name"),
-            action="로그인",
+            name="인증 시도",
+            action="로그인 차단",
             target="관리자 인증",
-            details="비밀번호 불일치 실패",
+            details=f"반복 로그인 실패로 인한 임시 잠금 상태 ({remaining_mins}분 대기 필요)",
             result="실패",
             ip_address=ip_address
         )
-        return None, "비밀번호가 올바르지 않습니다."
+        return None, f"반복적인 로그인 실패로 인해 로그인이 일시적으로 제한되었습니다. {remaining_mins}분 후 다시 시도해주세요."
 
-    # 로그인 성공 처리 (마지막 로그인 일시 갱신)
+    admin = get_admin_by_username(username)
+
+    # 계정이 없거나 비활성/잠김이거나 비밀번호가 틀린 경우 모두 통합 에러 메시지 반환
+    if not admin or admin.get("status") != "active" or not check_password_hash(admin.get("password_hash", ""), password):
+        record_login_failure(username, ip_address)
+        log_admin_action(
+            admin_id=admin.get("id") if admin else None,
+            username=username,
+            name=admin.get("name") if admin else "알수없음",
+            action="로그인 실패",
+            target="관리자 인증",
+            details="인증 정보 불일치",
+            result="실패",
+            ip_address=ip_address
+        )
+        return None, "아이디 또는 비밀번호가 일치하지 않습니다."
+
+    # 로그인 성공: 실패 카운터 초기화
+    clear_login_failures(username, ip_address)
+
+    # 마지막 로그인 일시 갱신
     now_str = datetime.now(timezone.utc).isoformat()
     conn = get_sqlite_conn()
     cursor = conn.cursor()
@@ -268,7 +401,7 @@ def authenticate_admin(username: str, password: str, ip_address: str = None) -> 
         name=admin["name"],
         action="로그인",
         target="관리자 시스템",
-        details="로그인 성공",
+        details="관리자 로그인 성공",
         result="성공",
         ip_address=ip_address
     )
@@ -277,7 +410,7 @@ def authenticate_admin(username: str, password: str, ip_address: str = None) -> 
 
 def create_admin(username: str, name: str, email: str, password: str, role: str,
                  status: str = "active", must_change_password: bool = False,
-                 creator_info: dict = None) -> tuple[dict | None, str | None]:
+                 creator_info: dict = None) -> tuple[dict | None, str | list[str] | None]:
     """새로운 관리자 계정 생성 (SUPER_ADMIN 전용)"""
     if not username or not name or not email or not password or not role:
         return None, "모든 필수 항목을 입력해주세요."
@@ -285,8 +418,9 @@ def create_admin(username: str, name: str, email: str, password: str, role: str,
     if role not in ROLES:
         return None, "올바르지 않은 역할입니다."
 
-    if len(password) < 6:
-        return None, "비밀번호는 최소 6자 이상이어야 합니다."
+    is_valid, validation_errors = validate_password_complexity(password, username=username)
+    if not is_valid:
+        return None, validation_errors
 
     conn = get_sqlite_conn()
     cursor = conn.cursor()
@@ -447,14 +581,15 @@ def delete_admin(admin_id: str, operator_info: dict = None) -> tuple[bool, str |
 
 
 def reset_admin_password(admin_id: str, new_password: str, must_change: bool = True,
-                         operator_info: dict = None) -> tuple[bool, str | None]:
+                         operator_info: dict = None) -> tuple[bool, str | list[str] | None]:
     """관리자 비밀번호 초기화 (SUPER_ADMIN 전용)"""
     target = get_admin_by_id(admin_id)
     if not target:
         return False, "관리자를 찾을 수 없습니다."
 
-    if len(new_password) < 6:
-        return False, "비밀번호는 최소 6자 이상이어야 합니다."
+    is_valid, validation_errors = validate_password_complexity(new_password, username=target["username"])
+    if not is_valid:
+        return False, validation_errors
 
     pw_hash = generate_password_hash(new_password)
     now_str = datetime.now(timezone.utc).isoformat()
@@ -482,21 +617,51 @@ def reset_admin_password(admin_id: str, new_password: str, must_change: bool = T
     return True, None
 
 
-def change_own_password(admin_id: str, current_pw: str, new_pw: str) -> tuple[bool, str | None]:
-    """관리자 본인 비밀번호 변경"""
+def verify_admin_password(admin_id: str, password: str) -> bool:
+    """중요 관리자 작업 전 본인 인증을 위한 비밀번호 재검증 함수"""
     admin = get_admin_by_id(admin_id)
-    if not admin:
-        return False, "관리자 정보를 찾을 수 없습니다."
+    if not admin or admin.get("status") != "active":
+        return False
+    return check_password_hash(admin.get("password_hash", ""), password)
 
+
+def change_own_password(admin_id: str, current_pw: str, new_pw: str) -> tuple[bool, str | list[str] | None]:
+    """
+    관리자 본인 비밀번호 변경:
+    1. 현재 세션 및 관리자 계정 존재 여부 검증
+    2. 현재 비밀번호 일치 여부 필수 확인 (불일치 시 "현재 비밀번호가 일치하지 않습니다.")
+    3. 기존 비밀번호와 동일한지 확인
+    4. 새 비밀번호 12자 이상 복합 보안 조건 확인 (불충족 시 상세 조건 목록 반환)
+    5. 안전한 해시 방식으로 암호화하여 DB 저장
+    6. 활동 로그 기록 (실제 비밀번호 문자열은 절대 저장하지 않음)
+    """
+    admin = get_admin_by_id(admin_id)
+    if not admin or admin.get("status") != "active":
+        return False, "관리자 인증 정보가 유효하지 않습니다."
+
+    # 1. 현재 비밀번호 검증
     if not check_password_hash(admin.get("password_hash", ""), current_pw):
+        log_admin_action(
+            admin_id=admin["id"],
+            username=admin["username"],
+            name=admin["name"],
+            action="비밀번호 변경 실패",
+            target="보안 설정",
+            details="현재 비밀번호 불일치",
+            result="실패"
+        )
         return False, "현재 비밀번호가 일치하지 않습니다."
 
-    if len(new_pw) < 6:
-        return False, "새 비밀번호는 최소 6자 이상이어야 합니다."
+    # 2. 기존 비밀번호와 동일 여부 확인
+    if check_password_hash(admin.get("password_hash", ""), new_pw) or current_pw == new_pw:
+        return False, "기존 비밀번호와 동일한 비밀번호는 사용할 수 없습니다."
 
-    if current_pw == new_pw:
-        return False, "새 비밀번호가 현재 비밀번호와 동일합니다."
+    # 3. 새 비밀번호 보안 조건 검증
+    is_valid, validation_errors = validate_password_complexity(new_pw, username=admin["username"])
+    if not is_valid:
+        return False, validation_errors
 
+    # 4. 안전한 비밀번호 해시 생성 및 갱신
     pw_hash = generate_password_hash(new_pw)
     now_str = datetime.now(timezone.utc).isoformat()
 
@@ -510,13 +675,14 @@ def change_own_password(admin_id: str, current_pw: str, new_pw: str) -> tuple[bo
     conn.commit()
     conn.close()
 
+    # 5. 감사 활동 로그 기록 (실제 비밀번호 제외)
     log_admin_action(
         admin_id=admin["id"],
         username=admin["username"],
         name=admin["name"],
-        action="본인 비밀번호 변경",
+        action="관리자 비밀번호 변경",
         target="보안 설정",
-        details="비밀번호 성공적으로 변경 완료",
+        details="비밀번호 변경 성공 및 기존 세션 종료 처리",
         result="성공"
     )
     return True, None
@@ -622,26 +788,50 @@ def update_system_setting(key: str, value: str, operator_info: dict = None) -> b
 # =====================================================
 # 6. 관리자 인증 및 권한 확인 데코레이터
 # =====================================================
+# 관리자 세션 최대 유효 시간 (비활동 시 30분 만료)
+ADMIN_SESSION_LIFETIME_SECONDS = 30 * 60
+
+
 def admin_login_required(view_func):
-    """관리자 로그인 여부 확인 데코레이터"""
+    """
+    관리자 로그인 여부 및 세션 유효성/비활동 만료 확인 데코레이터
+    - 비인증자 접근 시 관리자 데이터를 일체 노출하지 않고 관리자 로그인 화면으로 이동
+    - 일정 시간 비활동 시 세션 자동 만료
+    """
     @wraps(view_func)
     def wrapper(*args, **kwargs):
         admin_id = session.get("admin_id")
         if not admin_id:
-            # 원래 가려던 경로를 next로 전달
+            # 원래 요청하려던 경로를 next로 전달
             next_url = request.full_path if request.query_string else request.path
             return redirect(url_for("admin.login", next=next_url))
 
-        # 세션에 담긴 계정이 아직 유효한지 확인
+        # 세션 비활동 만료 검사
+        now_ts = datetime.now(timezone.utc).timestamp()
+        last_activity = session.get("admin_last_activity")
+        if last_activity and (now_ts - last_activity > ADMIN_SESSION_LIFETIME_SECONDS):
+            # 세션 만료 처리
+            session.pop("admin_id", None)
+            session.pop("admin_username", None)
+            session.pop("admin_role", None)
+            session.pop("admin_name", None)
+            session.pop("admin_last_activity", None)
+            return redirect(url_for("admin.login", error="session_expired"))
+
+        # 최신 활동 시간 갱신
+        session["admin_last_activity"] = now_ts
+
+        # 데이터베이스 상의 계정 존재 여부 및 활성 상태 재확증
         admin = get_admin_by_id(admin_id)
         if not admin or admin.get("status") != "active":
             session.pop("admin_id", None)
             session.pop("admin_username", None)
             session.pop("admin_role", None)
             session.pop("admin_name", None)
-            return redirect(url_for("admin.login", error="inactive_account"))
+            session.pop("admin_last_activity", None)
+            return redirect(url_for("admin.login", error="invalid_credentials"))
 
-        # 최신 권한 정보를 g 또는 session에 최신화
+        # 최신 권한 정보를 session에 최신화
         session["admin_role"] = admin["role"]
         session["admin_name"] = admin["name"]
         return view_func(*args, **kwargs)
