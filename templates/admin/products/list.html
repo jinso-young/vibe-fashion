@@ -1,0 +1,146 @@
+{% extends "admin/base.html" %}
+
+{% block title %}상품 관리{% endblock %}
+{% block page_title %}상품 관리{% endblock %}
+
+{% block content %}
+<div class="admin-card">
+    <div class="admin-card-header flex-wrap gap-2">
+        <div class="d-flex align-items-center gap-2">
+            <h5 class="fw-bold mb-0 text-dark"><i class="bi bi-box-seam-fill text-primary me-2"></i>전체 상품 목록</h5>
+            <span class="badge bg-light text-secondary border">총 {{ products|length }}개</span>
+        </div>
+
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+            <!-- 필터 및 검색 폼 -->
+            <form method="GET" action="{{ url_for('admin.products_list') }}" class="d-flex align-items-center gap-2 flex-wrap">
+                <!-- 카테고리 필터 -->
+                <select name="category" class="form-select form-select-sm" style="width: auto;" onchange="this.form.submit()">
+                    <option value="">전체 카테고리</option>
+                    {% for cat in categories %}
+                    <option value="{{ cat.slug }}" {% if category_filter == cat.slug %}selected{% endif %}>{{ cat.name }}</option>
+                    {% endfor %}
+                </select>
+
+                <!-- 상태 필터 -->
+                <select name="status" class="form-select form-select-sm" style="width: auto;" onchange="this.form.submit()">
+                    <option value="">전체 판매상태</option>
+                    <option value="active" {% if status_filter == 'active' %}selected{% endif %}>판매중</option>
+                    <option value="sold_out" {% if status_filter == 'sold_out' %}selected{% endif %}>품절</option>
+                    <option value="hidden" {% if status_filter == 'hidden' %}selected{% endif %}>판매중지</option>
+                </select>
+
+                <div class="input-group input-group-sm" style="width: 220px;">
+                    <input type="text" name="search" class="form-control" placeholder="상품명 검색" value="{{ search or '' }}">
+                    <button type="submit" class="btn btn-outline-secondary">
+                        <i class="bi bi-search"></i>
+                    </button>
+                    {% if search or category_filter or status_filter %}
+                        <a href="{{ url_for('admin.products_list') }}" class="btn btn-outline-danger" title="초기화">
+                            <i class="bi bi-x-lg"></i>
+                        </a>
+                    {% endif %}
+                </div>
+            </form>
+
+            <!-- 상품 등록 버튼 -->
+            {% if has_perm('product_create') %}
+            <a href="{{ url_for('admin.product_create') }}" class="btn btn-primary btn-sm d-flex align-items-center gap-1 shadow-sm">
+                <i class="bi bi-plus-lg"></i> 상품 등록
+            </a>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="admin-card-body p-0">
+        {% if products %}
+        <div class="table-responsive">
+            <table class="table table-admin mb-0">
+                <thead>
+                    <tr>
+                        <th style="width: 70px;">이미지</th>
+                        <th>상품명</th>
+                        <th>카테고리</th>
+                        <th class="text-end">판매 가격</th>
+                        <th class="text-center">재고 수량</th>
+                        <th class="text-center">판매량</th>
+                        <th class="text-center" style="width: 140px;">판매 상태</th>
+                        <th class="text-center" style="width: 130px;">관리</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for p in products %}
+                    <tr>
+                        <td>
+                            <img src="{{ p.thumbnail_url }}" alt="{{ p.name }}" class="rounded border object-fit-cover" style="width: 50px; height: 50px;">
+                        </td>
+                        <td>
+                            <div class="fw-semibold text-dark">{{ p.name }}</div>
+                            <small class="text-muted font-monospace" style="font-size: 0.75rem;">{{ p.slug or p.id[:8] }}</small>
+                        </td>
+                        <td class="text-secondary small">{{ (p.categories or {}).name or '-' }}</td>
+                        <td class="text-end">
+                            {% if p.sale_price and p.sale_price < p.price %}
+                                <div class="text-muted text-decoration-line-through small" style="font-size: 0.75rem;">{{ "{:,}".format(p.price) }}원</div>
+                                <div class="fw-bold text-danger">{{ "{:,}".format(p.sale_price) }}원</div>
+                            {% else %}
+                                <div class="fw-bold">{{ "{:,}".format(p.price) }}원</div>
+                            {% endif %}
+                        </td>
+                        <td class="text-center">
+                            {% if p.stock == 0 %}
+                                <span class="badge bg-danger">0개 (품절)</span>
+                            {% elif p.stock <= 5 %}
+                                <span class="badge bg-warning text-dark">{{ p.stock }}개 (부족)</span>
+                            {% else %}
+                                <span class="badge bg-light text-dark border">{{ p.stock }}개</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-center fw-medium">{{ p.sales_count or 0 }}개</td>
+                        <td class="text-center">
+                            <!-- 판매상태 드롭다운 변경 -->
+                            <form method="POST" action="{{ url_for('admin.product_change_status', product_id=p.id) }}" class="d-inline">
+                                <select name="status" class="form-select form-select-sm" style="font-size: 0.8rem;" onchange="this.form.submit()">
+                                    <option value="active" {% if p.status == 'active' %}selected{% endif %}>판매중</option>
+                                    <option value="sold_out" {% if p.status == 'sold_out' %}selected{% endif %}>품절</option>
+                                    <option value="hidden" {% if p.status == 'hidden' %}selected{% endif %}>판매중지</option>
+                                </select>
+                            </form>
+                        </td>
+                        <td class="text-center">
+                            <div class="btn-group btn-group-sm">
+                                <a href="{{ url_for('admin.product_edit', product_id=p.id) }}" class="btn btn-outline-secondary" title="수정">
+                                    <i class="bi bi-pencil-square"></i>
+                                </a>
+
+                                {% if has_perm('product_delete') %}
+                                <form method="POST" action="{{ url_for('admin.product_delete', product_id=p.id) }}" class="d-inline"
+                                      data-confirm="정말 이 상품({{ p.name }})을 삭제하시겠습니까? 삭제한 상품은 복구할 수 없습니다."
+                                      data-confirm-title="상품 삭제 확인"
+                                      data-confirm-btn="삭제"
+                                      data-confirm-btn-class="btn-danger">
+                                    <button type="submit" class="btn btn-outline-danger" title="상품 삭제">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </form>
+                                {% else %}
+                                <button type="button" class="btn btn-outline-secondary disabled" title="상품 삭제 권한 없음 (SUPER_ADMIN 전용)">
+                                    <i class="bi bi-lock"></i>
+                                </button>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="p-5 text-center text-muted">
+            <i class="bi bi-inbox fs-1 d-block mb-2 text-secondary"></i>
+            등록된 상품이 없거나 검색 결과가 없습니다.
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

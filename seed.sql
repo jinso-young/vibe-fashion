@@ -286,4 +286,15 @@ BEGIN
     -- 8번 상품 이미지 (클래식 스트라이프 셔츠)
     (v_prod_8, '/static/images/products/stripe-shirt.png', '클래식 스트라이프 셔츠 메인 썸네일', 0, TRUE);
 
+  -- ----------------------------------------------------------------------------
+  -- 5. 관리자 계정 초기 데이터 (비밀번호: admin1234!)
+  -- ----------------------------------------------------------------------------
+  -- pbkdf2:sha256 해시: scrypt:32768:8:1$... 또는 werkzeug pbkdf2:sha256
+  INSERT INTO public.admin_users (username, name, email, password_hash, role, status)
+  VALUES
+    ('superadmin', '최고 관리자', 'superadmin@vibe.com', 'scrypt:32768:8:1$u7xV9a4T7273FGBj$87293fe2bc3dbdbebaea88126b864a7c8137397bdf7592cf99aebca59ceaafe152fe150f16fbc8235a8bc3bdf906e5da2d3d3ef423db359fe2d48074d2275e53', 'SUPER_ADMIN', 'active'),
+    ('admin', '운영 관리자', 'admin@vibe.com', 'scrypt:32768:8:1$u7xV9a4T7273FGBj$87293fe2bc3dbdbebaea88126b864a7c8137397bdf7592cf99aebca59ceaafe152fe150f16fbc8235a8bc3bdf906e5da2d3d3ef423db359fe2d48074d2275e53', 'ADMIN', 'active'),
+    ('staff', '상품/주문 담당자', 'staff@vibe.com', 'scrypt:32768:8:1$u7xV9a4T7273FGBj$87293fe2bc3dbdbebaea88126b864a7c8137397bdf7592cf99aebca59ceaafe152fe150f16fbc8235a8bc3bdf906e5da2d3d3ef423db359fe2d48074d2275e53', 'STAFF', 'active')
+  ON CONFLICT (username) DO NOTHING;
+
 END $$;

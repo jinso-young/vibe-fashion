@@ -1,0 +1,40 @@
+{% extends "admin/base.html" %}
+
+{% block title %}접근 권한 없음 (403 Forbidden){% endblock %}
+{% block page_title %}권한 오류{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center py-5">
+    <div class="col-md-7 col-lg-5 text-center">
+        <div class="card border-0 shadow-sm p-4 rounded-4">
+            <div class="mb-3 text-warning">
+                <i class="bi bi-shield-slash-fill" style="font-size: 4rem;"></i>
+            </div>
+            <h3 class="fw-bold text-dark mb-2">접근 권한이 없습니다 (403)</h3>
+            <p class="text-secondary mb-4">
+                현재 로그인하신 계정(<strong>{{ session.get('admin_name') }}</strong> / 
+                <span class="badge badge-role-{{ session.get('admin_role') }}">{{ admin_role_title }}</span>)은
+                요청하신 메뉴 또는 기능에 접근할 수 있는 권한이 없습니다.
+            </p>
+
+            <div class="bg-light p-3 rounded-3 text-start small mb-4 border">
+                <div class="fw-bold mb-1"><i class="bi bi-info-circle me-1"></i> 권한 안내</div>
+                <ul class="mb-0 ps-3 text-secondary">
+                    <li>필요 권한: <code>{{ permission_code or (required_roles|join(', ') if required_roles else '상위 관리자 권한') }}</code></li>
+                    <li>현재 역할: <strong>{{ admin_role_title }} ({{ session.get('admin_role') }})</strong></li>
+                    <li>접근이 필요한 경우 최고 관리자(SUPER_ADMIN)에게 권한 조정을 요청하세요.</li>
+                </ul>
+            </div>
+
+            <div class="d-flex justify-content-center gap-2">
+                <a href="{{ url_for('admin.dashboard') }}" class="btn btn-primary px-4 py-2">
+                    <i class="bi bi-house-door-fill me-1"></i> 관리자 대시보드로 이동
+                </a>
+                <button type="button" class="btn btn-outline-secondary px-3" onclick="history.back()">
+                    <i class="bi bi-arrow-left me-1"></i> 이전 페이지
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

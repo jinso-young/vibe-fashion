@@ -1,0 +1,255 @@
+{% extends "admin/base.html" %}
+
+{% block title %}주문 상세 ({{ order.order_number }}){% endblock %}
+{% block page_title %}주문 상세 내역{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-3">
+    <a href="{{ url_for('admin.orders_list') }}" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-arrow-left me-1"></i> 주문 목록으로 돌아가기
+    </a>
+
+    <div class="d-flex gap-2">
+        <!-- 주문 취소 버튼 (SUPER_ADMIN, ADMIN 가능, STAFF 제한) -->
+        {% if order.status != 'cancelled' %}
+            {% if has_perm('order_cancel') %}
+            <button type="button" class="btn btn-outline-danger btn-sm" data-bs-toggle="modal" data-bs-target="#cancelOrderModal">
+                <i class="bi bi-x-circle me-1"></i> 주문 취소 (재고원복)
+            </button>
+            {% else %}
+            <button type="button" class="btn btn-outline-secondary btn-sm disabled" title="주문 취소 권한 없음 (STAFF)">
+                <i class="bi bi-lock me-1"></i> 주문 취소 제한
+            </button>
+            {% endif %}
+
+            <!-- 환불 처리 버튼 (SUPER_ADMIN, ADMIN 가능, STAFF 불가) -->
+            {% if has_perm('order_refund') and order.status in ['paid', 'shipping', 'delivered', 'completed'] %}
+            <button type="button" class="btn btn-outline-warning btn-sm text-dark" data-bs-toggle="modal" data-bs-target="#refundOrderModal">
+                <i class="bi bi-arrow-counterclockwise me-1"></i> 환불 처리
+            </button>
+            {% endif %}
+        {% endif %}
+    </div>
+</div>
+
+<div class="row g-3">
+    <!-- 왼쪽: 주문 상품 내역 & 결제/배송 정보 -->
+    <div class="col-lg-8">
+        <!-- 주문 상품 목록 -->
+        <div class="admin-card mb-3">
+            <div class="admin-card-header">
+                <h6 class="fw-bold mb-0 text-dark">
+                    <i class="bi bi-bag-check me-2 text-primary"></i>주문 상품 목록 ({{ items|length }}개 품목)
+                </h6>
+            </div>
+            <div class="admin-card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-admin mb-0">
+                        <thead>
+                            <tr>
+                                <th>상품 정보</th>
+                                <th>옵션</th>
+                                <th class="text-end">단가</th>
+                                <th class="text-center">수량</th>
+                                <th class="text-end">합계 금액</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in items %}
+                            <tr>
+                                <td>
+                                    <div class="fw-semibold text-dark">{{ item.product_name }}</div>
+                                    <small class="text-muted font-monospace">{{ item.product_id[:8] if item.product_id else '-' }}</small>
+                                </td>
+                                <td class="text-secondary small">{{ item.option_name or '기본' }}</td>
+                                <td class="text-end">{{ "{:,}".format(item.unit_price or 0) }}원</td>
+                                <td class="text-center fw-bold">{{ item.quantity }}개</td>
+                                <td class="text-end fw-bold text-dark">{{ "{:,}".format(item.total_price or 0) }}원</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- 배송 및 수령인 정보 -->
+        <div class="admin-card">
+            <div class="admin-card-header">
+                <h6 class="fw-bold mb-0 text-dark"><i class="bi bi-truck me-2 text-info"></i>배송지 및 수령 정보</h6>
+            </div>
+            <div class="admin-card-body">
+                <div class="row g-3">
+                    <div class="col-sm-6">
+                        <label class="text-muted small d-block">수령인</label>
+                        <span class="fw-semibold text-dark">{{ order.recipient_name or '-' }}</span>
+                    </div>
+                    <div class="col-sm-6">
+                        <label class="text-muted small d-block">연락처</label>
+                        <span class="fw-semibold text-dark">{{ order.recipient_phone or '-' }}</span>
+                    </div>
+                    <div class="col-12">
+                        <label class="text-muted small d-block">배송지 주소</label>
+                        <span class="fw-semibold text-dark">
+                            [{{ order.postal_code or '우편번호 미입력' }}] {{ order.shipping_address or '주소 정보 없음' }}
+                            {% if order.shipping_address_detail %} {{ order.shipping_address_detail }}{% endif %}
+                        </span>
+                    </div>
+                    <div class="col-12">
+                        <label class="text-muted small d-block">배송 메모</label>
+                        <span class="text-secondary small">{{ order.delivery_memo or '요청사항 없음' }}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 오른쪽: 주문 요약 및 상태 제어 -->
+    <div class="col-lg-4">
+        <!-- 상태 관리 카드 -->
+        <div class="admin-card mb-3 border-top border-4 border-primary">
+            <div class="admin-card-header">
+                <h6 class="fw-bold mb-0 text-dark"><i class="bi bi-toggles me-2 text-primary"></i>주문/배송 상태 변경</h6>
+            </div>
+            <div class="admin-card-body">
+                <div class="mb-3">
+                    <label class="text-muted small d-block mb-1">현재 주문 상태</label>
+                    <h4>
+                        {% if order.status == 'pending' %}
+                            <span class="badge bg-secondary">결제대기</span>
+                        {% elif order.status == 'paid' %}
+                            <span class="badge bg-primary">결제완료</span>
+                        {% elif order.status == 'shipping' %}
+                            <span class="badge bg-info text-dark">배송중</span>
+                        {% elif order.status == 'delivered' %}
+                            <span class="badge bg-success">배송완료</span>
+                        {% elif order.status == 'completed' %}
+                            <span class="badge bg-success">구매확정</span>
+                        {% elif order.status == 'cancelled' %}
+                            <span class="badge bg-danger">주문취소</span>
+                        {% else %}
+                            <span class="badge bg-light text-dark">{{ order.status }}</span>
+                        {% endif %}
+                    </h4>
+                </div>
+
+                {% if order.status != 'cancelled' %}
+                <form method="POST" action="{{ url_for('admin.order_change_status', order_id=order.id) }}">
+                    <div class="mb-3">
+                        <label for="status" class="form-label small fw-semibold text-secondary">상태 즉시 변경</label>
+                        <select class="form-select form-select-sm" id="status" name="status">
+                            <option value="pending" {% if order.status == 'pending' %}selected{% endif %}>결제대기 (pending)</option>
+                            <option value="paid" {% if order.status == 'paid' %}selected{% endif %}>결제완료 (paid)</option>
+                            <option value="shipping" {% if order.status == 'shipping' %}selected{% endif %}>배송중 (shipping)</option>
+                            <option value="delivered" {% if order.status == 'delivered' %}selected{% endif %}>배송완료 (delivered)</option>
+                            <option value="completed" {% if order.status == 'completed' %}selected{% endif %}>구매확정 (completed)</option>
+                        </select>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary btn-sm w-100 shadow-sm">
+                        <i class="bi bi-arrow-repeat me-1"></i> 상태 변경 적용
+                    </button>
+                </form>
+                {% else %}
+                <div class="alert alert-danger py-2 px-3 small mb-0">
+                    <i class="bi bi-x-circle-fill me-1"></i> 취소 완료된 주문입니다.
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- 결제 금액 요약 카드 -->
+        <div class="admin-card">
+            <div class="admin-card-header">
+                <h6 class="fw-bold mb-0 text-dark"><i class="bi bi-credit-card me-2 text-success"></i>결제 금액 정보</h6>
+            </div>
+            <div class="admin-card-body">
+                <div class="d-flex justify-content-between mb-2 small">
+                    <span class="text-secondary">총 주문 금액</span>
+                    <span>{{ "{:,}".format(order.total_amount or 0) }}원</span>
+                </div>
+                <div class="d-flex justify-content-between mb-2 small">
+                    <span class="text-secondary">배송비</span>
+                    <span>+{{ "{:,}".format(order.shipping_fee or 0) }}원</span>
+                </div>
+                <div class="d-flex justify-content-between mb-2 small text-danger">
+                    <span>할인 금액</span>
+                    <span>-{{ "{:,}".format(order.discount_amount or 0) }}원</span>
+                </div>
+                <hr class="my-2">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <span class="fw-bold text-dark">최종 결제 금액</span>
+                    <span class="fs-5 fw-bold text-primary">{{ "{:,}".format(order.final_amount or 0) }}원</span>
+                </div>
+
+                <div class="p-2 bg-light rounded small text-secondary">
+                    <div><strong>결제 수단:</strong> {{ order.payment_method or '일반 결제' }}</div>
+                    <div><strong>주문 일시:</strong> {{ order.created_at[:16].replace('T', ' ') if order.created_at else '-' }}</div>
+                    {% if order.paid_at %}
+                    <div><strong>결제 일시:</strong> {{ order.paid_at[:16].replace('T', ' ') }}</div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 주문 취소 모달 -->
+<div class="modal fade" id="cancelOrderModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <form method="POST" action="{{ url_for('admin.order_cancel', order_id=order.id) }}">
+                <div class="modal-header">
+                    <h5 class="modal-title fw-bold text-danger"><i class="bi bi-exclamation-triangle-fill me-2"></i>주문 취소 및 재고 원복</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="text-secondary small mb-3">
+                        정말 이 주문(<strong>{{ order.order_number }}</strong>)을 취소하시겠습니까?<br>
+                        취소 시 <strong>주문 품목의 수량만큼 상품 재고가 자동으로 복구</strong>됩니다.
+                    </p>
+                    <div class="mb-3">
+                        <label for="cancel_reason" class="form-label small fw-semibold text-secondary">취소 사유</label>
+                        <input type="text" class="form-control" id="cancel_reason" name="reason" value="고객 요청에 의한 관리자 취소" required>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">닫기</button>
+                    <button type="submit" class="btn btn-danger px-4">주문 취소 실행</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- 환불 처리 모달 -->
+<div class="modal fade" id="refundOrderModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <form method="POST" action="{{ url_for('admin.order_refund', order_id=order.id) }}">
+                <div class="modal-header">
+                    <h5 class="modal-title fw-bold text-warning text-dark"><i class="bi bi-arrow-counterclockwise me-2"></i>환불 승인 및 처리</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="text-secondary small mb-3">
+                        주문(<strong>{{ order.order_number }}</strong>)에 대해 환불을 완료하고 상태를 갱신합니다.
+                    </p>
+                    <div class="mb-3">
+                        <label for="refund_amount" class="form-label small fw-semibold text-secondary">환불 금액 (원)</label>
+                        <input type="number" class="form-control" id="refund_amount" name="refund_amount" value="{{ order.final_amount }}" max="{{ order.final_amount }}" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="refund_reason" class="form-label small fw-semibold text-secondary">환불 사유</label>
+                        <input type="text" class="form-control" id="refund_reason" name="reason" value="단순 변심 또는 상품 불량 환불" required>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">닫기</button>
+                    <button type="submit" class="btn btn-warning px-4 text-dark fw-bold">환불 승인 실행</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

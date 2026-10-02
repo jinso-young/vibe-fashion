@@ -1,0 +1,105 @@
+{% extends "admin/base.html" %}
+
+{% block title %}주문 관리{% endblock %}
+{% block page_title %}주문 관리{% endblock %}
+
+{% block content %}
+<div class="admin-card">
+    <div class="admin-card-header flex-wrap gap-2">
+        <div class="d-flex align-items-center gap-2">
+            <h5 class="fw-bold mb-0 text-dark"><i class="bi bi-bag-check-fill text-primary me-2"></i>전체 주문 목록</h5>
+            <span class="badge bg-light text-secondary border">총 {{ orders|length }}건</span>
+        </div>
+
+        <!-- 필터 및 검색 폼 -->
+        <form method="GET" action="{{ url_for('admin.orders_list') }}" class="d-flex align-items-center gap-2 flex-wrap">
+            <select name="status" class="form-select form-select-sm" style="width: auto;" onchange="this.form.submit()">
+                <option value="">전체 주문상태</option>
+                <option value="pending" {% if status_filter == 'pending' %}selected{% endif %}>결제대기 (pending)</option>
+                <option value="paid" {% if status_filter == 'paid' %}selected{% endif %}>결제완료 (paid)</option>
+                <option value="shipping" {% if status_filter == 'shipping' %}selected{% endif %}>배송중 (shipping)</option>
+                <option value="delivered" {% if status_filter == 'delivered' %}selected{% endif %}>배송완료 (delivered)</option>
+                <option value="completed" {% if status_filter == 'completed' %}selected{% endif %}>구매확정 (completed)</option>
+                <option value="cancelled" {% if status_filter == 'cancelled' %}selected{% endif %}>주문취소 (cancelled)</option>
+            </select>
+
+            <div class="input-group input-group-sm" style="width: 240px;">
+                <input type="text" name="search" class="form-control" placeholder="주문번호, 주문자, 연락처" value="{{ search or '' }}">
+                <button type="submit" class="btn btn-outline-secondary">
+                    <i class="bi bi-search"></i>
+                </button>
+                {% if search or status_filter %}
+                    <a href="{{ url_for('admin.orders_list') }}" class="btn btn-outline-danger" title="초기화">
+                        <i class="bi bi-x-lg"></i>
+                    </a>
+                {% endif %}
+            </div>
+        </form>
+    </div>
+
+    <div class="admin-card-body p-0">
+        {% if orders %}
+        <div class="table-responsive">
+            <table class="table table-admin mb-0">
+                <thead>
+                    <tr>
+                        <th style="width: 170px;">주문번호</th>
+                        <th>주문자</th>
+                        <th>주문 상품</th>
+                        <th class="text-center">총 수량</th>
+                        <th class="text-end">결제 금액</th>
+                        <th class="text-center">주문 상태</th>
+                        <th>주문일시</th>
+                        <th class="text-center" style="width: 90px;">상세</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for o in orders %}
+                    <tr>
+                        <td class="font-monospace fw-bold text-primary small">{{ o.order_number }}</td>
+                        <td>
+                            <div class="fw-semibold text-dark">{{ o.recipient_name or '주문자' }}</div>
+                            <small class="text-muted">{{ o.recipient_phone or '-' }}</small>
+                        </td>
+                        <td class="text-truncate" style="max-width: 220px;">
+                            <span class="text-dark">{{ o.item_summary }}</span>
+                        </td>
+                        <td class="text-center fw-medium">{{ o.total_qty or 0 }}개</td>
+                        <td class="text-end fw-bold text-dark">{{ "{:,}".format(o.final_amount or 0) }}원</td>
+                        <td class="text-center">
+                            {% if o.status == 'pending' %}
+                                <span class="badge bg-secondary">결제대기</span>
+                            {% elif o.status == 'paid' %}
+                                <span class="badge bg-primary">결제완료</span>
+                            {% elif o.status == 'shipping' %}
+                                <span class="badge bg-info text-dark">배송중</span>
+                            {% elif o.status == 'delivered' %}
+                                <span class="badge bg-success">배송완료</span>
+                            {% elif o.status == 'completed' %}
+                                <span class="badge bg-success">구매확정</span>
+                            {% elif o.status == 'cancelled' %}
+                                <span class="badge bg-danger">주문취소</span>
+                            {% else %}
+                                <span class="badge bg-light text-dark">{{ o.status }}</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-muted small">{{ o.created_at[:16].replace('T', ' ') if o.created_at else '-' }}</td>
+                        <td class="text-center">
+                            <a href="{{ url_for('admin.order_detail', order_id=o.id) }}" class="btn btn-sm btn-outline-primary py-1 px-2" style="font-size: 0.8rem;">
+                                조회
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="p-5 text-center text-muted">
+            <i class="bi bi-cart-x fs-1 d-block mb-2 text-secondary"></i>
+            조건에 일치하는 주문 내역이 없습니다.
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

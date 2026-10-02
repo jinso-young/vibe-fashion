@@ -1,0 +1,220 @@
+{% extends "admin/base.html" %}
+
+{% block title %}판매 및 매출 통계{% endblock %}
+{% block page_title %}판매 및 매출 통계 분석{% endblock %}
+
+{% block content %}
+<!-- 기간 필터 선택 바 -->
+<div class="admin-card mb-4">
+    <div class="admin-card-body p-3">
+        <form method="GET" action="{{ url_for('admin.statistics') }}" class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+            <!-- 프리셋 버튼 그룹 -->
+            <div class="btn-group btn-group-sm" role="group">
+                <a href="{{ url_for('admin.statistics', period='today') }}" class="btn btn-{{ 'primary' if period == 'today' else 'outline-secondary' }}">오늘</a>
+                <a href="{{ url_for('admin.statistics', period='7days') }}" class="btn btn-{{ 'primary' if period == '7days' else 'outline-secondary' }}">최근 7일</a>
+                <a href="{{ url_for('admin.statistics', period='this_month') }}" class="btn btn-{{ 'primary' if period == 'this_month' else 'outline-secondary' }}">이번 달</a>
+                <a href="{{ url_for('admin.statistics', period='last_month') }}" class="btn btn-{{ 'primary' if period == 'last_month' else 'outline-secondary' }}">지난달</a>
+            </div>
+
+            <!-- 직접 기간 선택 -->
+            <div class="d-flex align-items-center gap-2">
+                <input type="hidden" name="period" value="custom">
+                <div class="input-group input-group-sm">
+                    <span class="input-group-text bg-light text-secondary">조회 기간</span>
+                    <input type="date" class="form-control" name="start_date" value="{{ start_date }}">
+                    <span class="input-group-text bg-light">~</span>
+                    <input type="date" class="form-control" name="end_date" value="{{ end_date }}">
+                    <button type="submit" class="btn btn-primary">조회</button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- 기간 내 핵심 성과 카드 (3개) -->
+<div class="row g-3 mb-4">
+    <!-- 총 매출 -->
+    <div class="col-md-4">
+        <div class="admin-card mb-0 border-start border-4 border-primary">
+            <div class="admin-card-body p-3">
+                <span class="text-secondary small fw-semibold">선택 기간 총 매출액</span>
+                <h3 class="fw-bold text-primary mb-0 mt-2">{{ "{:,}".format(total_revenue) }}원</h3>
+                <small class="text-muted" style="font-size: 0.75rem;">결제완료 및 배송완료 주문 합산</small>
+            </div>
+        </div>
+    </div>
+
+    <!-- 총 주문 건수 -->
+    <div class="col-md-4">
+        <div class="admin-card mb-0 border-start border-4 border-success">
+            <div class="admin-card-body p-3">
+                <span class="text-secondary small fw-semibold">선택 기간 총 주문 건수</span>
+                <h3 class="fw-bold text-success mb-0 mt-2">{{ "{:,}".format(total_orders) }}건</h3>
+                <small class="text-muted" style="font-size: 0.75rem;">실제 유효 주문 건수</small>
+            </div>
+        </div>
+    </div>
+
+    <!-- 총 판매 수량 -->
+    <div class="col-md-4">
+        <div class="admin-card mb-0 border-start border-4 border-info">
+            <div class="admin-card-body p-3">
+                <span class="text-secondary small fw-semibold">선택 기간 총 판매 수량</span>
+                <h3 class="fw-bold text-info mb-0 mt-2">{{ "{:,}".format(total_sales_qty) }}개</h3>
+                <small class="text-muted" style="font-size: 0.75rem;">주문 품목 기준 수량 합계</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 시각화 차트: 일별 매출 & 일별 판매량 -->
+<div class="row g-3 mb-4">
+    <!-- 매출 추이 그래프 -->
+    <div class="col-lg-7">
+        <div class="admin-card mb-0 h-100">
+            <div class="admin-card-header">
+                <div class="fw-bold text-dark"><i class="bi bi-graph-up text-primary me-2"></i>일별 매출 추이</div>
+                <span class="text-muted small">단위: 원</span>
+            </div>
+            <div class="admin-card-body">
+                <canvas id="statRevChart" style="max-height: 280px; width: 100%;"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- 판매 수량 그래프 -->
+    <div class="col-lg-5">
+        <div class="admin-card mb-0 h-100">
+            <div class="admin-card-header">
+                <div class="fw-bold text-dark"><i class="bi bi-bar-chart-fill text-success me-2"></i>일별 판매 수량</div>
+                <span class="text-muted small">단위: 개</span>
+            </div>
+            <div class="admin-card-body">
+                <canvas id="statSalesChart" style="max-height: 280px; width: 100%;"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 인기 상품 TOP 5 표 -->
+<div class="admin-card">
+    <div class="admin-card-header">
+        <div class="fw-bold text-dark"><i class="bi bi-trophy-fill text-warning me-2"></i>선택 기간 베스트 인기 상품 TOP 5</div>
+        <span class="text-muted small">판매 수량 기준</span>
+    </div>
+    <div class="admin-card-body p-0">
+        {% if top_products %}
+        <div class="table-responsive">
+            <table class="table table-admin mb-0">
+                <thead>
+                    <tr>
+                        <th style="width: 70px;" class="text-center">순위</th>
+                        <th>상품명</th>
+                        <th class="text-center">누적 판매 수량</th>
+                        <th class="text-end">발생 매출액</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for p in top_products %}
+                    <tr>
+                        <td class="text-center">
+                            {% if loop.index == 1 %}
+                                <span class="badge bg-warning text-dark px-2 py-1"><i class="bi bi-trophy-fill"></i> 1위</span>
+                            {% elif loop.index == 2 %}
+                                <span class="badge bg-secondary px-2 py-1">2위</span>
+                            {% elif loop.index == 3 %}
+                                <span class="badge bg-bronze bg-dark text-white px-2 py-1">3위</span>
+                            {% else %}
+                                <span class="text-muted fw-bold">{{ loop.index }}위</span>
+                            {% endif %}
+                        </td>
+                        <td class="fw-semibold text-dark">{{ p.name }}</td>
+                        <td class="text-center fw-bold text-primary">{{ "{:,}".format(p.qty) }}개</td>
+                        <td class="text-end fw-bold">{{ "{:,}".format(p.revenue) }}원</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="p-5 text-center text-muted">
+            <i class="bi bi-graph-down fs-1 d-block mb-2 text-secondary"></i>
+            선택 기간 동안 판매된 상품 데이터가 없습니다.
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    const labels = {{ daily_labels|safe }};
+    const revenues = {{ daily_revenue|safe }};
+    const sales = {{ daily_sales|safe }};
+
+    // 1. 일별 매출 차트
+    const ctx1 = document.getElementById('statRevChart').getContext('2d');
+    new Chart(ctx1, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: '매출액 (원)',
+                data: revenues,
+                borderColor: '#2563eb',
+                backgroundColor: 'rgba(37, 99, 235, 0.1)',
+                fill: true,
+                tension: 0.25,
+                borderWidth: 2,
+                pointBackgroundColor: '#2563eb',
+                pointRadius: 4
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                tooltip: {
+                    callbacks: {
+                        label: function(ctx) { return ctx.parsed.y.toLocaleString() + '원'; }
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: { callback: function(v) { return v.toLocaleString() + '원'; } }
+                }
+            }
+        }
+    });
+
+    // 2. 일별 판매 수량 차트
+    const ctx2 = document.getElementById('statSalesChart').getContext('2d');
+    new Chart(ctx2, {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: '판매 수량 (개)',
+                data: sales,
+                backgroundColor: '#10b981',
+                borderRadius: 4
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: { stepSize: 1 }
+                }
+            }
+        }
+    });
+</script>
+{% endblock %}

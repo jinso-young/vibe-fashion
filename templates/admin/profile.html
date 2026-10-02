@@ -1,0 +1,86 @@
+{% extends "admin/base.html" %}
+
+{% block title %}관리자 프로필 및 비밀번호 변경{% endblock %}
+{% block page_title %}내 프로필 관리{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-6">
+        <div class="admin-card">
+            <div class="admin-card-header">
+                <h5 class="fw-bold mb-0 text-dark"><i class="bi bi-person-circle me-2 text-primary"></i>관리자 계정 정보</h5>
+            </div>
+            <div class="admin-card-body">
+                <div class="table-responsive mb-4">
+                    <table class="table table-bordered mb-0">
+                        <tbody>
+                            <tr>
+                                <th class="bg-light text-secondary" style="width: 35%;">관리자 ID</th>
+                                <td class="fw-semibold">{{ admin.username }}</td>
+                            </tr>
+                            <tr>
+                                <th class="bg-light text-secondary">이름</th>
+                                <td>{{ admin.name }}</td>
+                            </tr>
+                            <tr>
+                                <th class="bg-light text-secondary">이메일</th>
+                                <td>{{ admin.email }}</td>
+                            </tr>
+                            <tr>
+                                <th class="bg-light text-secondary">관리자 역할</th>
+                                <td>
+                                    <span class="badge badge-role-{{ admin.role }} fs-6">
+                                        {{ admin_role_title }}
+                                    </span>
+                                </td>
+                            </tr>
+                            <tr>
+                                <th class="bg-light text-secondary">마지막 로그인</th>
+                                <td class="text-muted">{{ admin.last_login_at[:19].replace('T', ' ') if admin.last_login_at else '-' }}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <hr class="my-4">
+
+                <h5 class="fw-bold mb-3 text-dark"><i class="bi bi-key-fill me-2 text-warning"></i>비밀번호 변경</h5>
+
+                {% if error %}
+                    <div class="alert alert-danger py-2 px-3 small mb-3">
+                        <i class="bi bi-exclamation-triangle-fill me-1"></i> {{ error }}
+                    </div>
+                {% endif %}
+                {% if success %}
+                    <div class="alert alert-success py-2 px-3 small mb-3">
+                        <i class="bi bi-check-circle-fill me-1"></i> {{ success }}
+                    </div>
+                {% endif %}
+
+                <form method="POST" action="{{ url_for('admin.profile') }}">
+                    <div class="mb-3">
+                        <label for="current_password" class="form-label small fw-semibold text-secondary">현재 비밀번호</label>
+                        <input type="password" class="form-control" id="current_password" name="current_password" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="new_password" class="form-label small fw-semibold text-secondary">새 비밀번호 (최소 6자)</label>
+                        <input type="password" class="form-control" id="new_password" name="new_password" minlength="6" required>
+                    </div>
+
+                    <div class="mb-4">
+                        <label for="confirm_password" class="form-label small fw-semibold text-secondary">새 비밀번호 확인</label>
+                        <input type="password" class="form-control" id="confirm_password" name="confirm_password" minlength="6" required>
+                    </div>
+
+                    <div class="d-flex justify-content-end gap-2">
+                        <button type="submit" class="btn btn-primary px-4">
+                            <i class="bi bi-check-lg me-1"></i> 비밀번호 변경 저장
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

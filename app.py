@@ -57,8 +57,10 @@ def create_app(config_override=None):
     # ---------------------------------------------------------
     from routes.main import main_bp
     from routes.auth import auth_bp
+    from routes.admin import admin_bp
     app.register_blueprint(main_bp)
     app.register_blueprint(auth_bp)
+    app.register_blueprint(admin_bp)
 
     # 404 에러 핸들러 (사용자가 잘못된 경로로 접근했을 때 친절한 안내)
     @app.errorhandler(404)

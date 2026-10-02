@@ -1,0 +1,266 @@
+{% extends "admin/base.html" %}
+
+{% block title %}관리자 계정 관리 (SUPER_ADMIN){% endblock %}
+{% block page_title %}관리자 계정 관리{% endblock %}
+
+{% block content %}
+<div class="admin-card">
+    <div class="admin-card-header flex-wrap gap-2">
+        <div class="d-flex align-items-center gap-2">
+            <h5 class="fw-bold mb-0 text-dark"><i class="bi bi-shield-lock-fill text-danger me-2"></i>관리자 계정 목록</h5>
+            <span class="badge bg-danger text-white">최고 관리자 전용 메뉴</span>
+        </div>
+
+        <button type="button" class="btn btn-primary btn-sm d-flex align-items-center gap-1 shadow-sm" data-bs-toggle="modal" data-bs-target="#newAdminModal">
+            <i class="bi bi-person-plus-fill"></i> 신규 관리자 추가
+        </button>
+    </div>
+
+    <div class="admin-card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-admin mb-0">
+                <thead>
+                    <tr>
+                        <th>관리자 ID</th>
+                        <th>이름</th>
+                        <th>이메일</th>
+                        <th class="text-center">역할 (권한)</th>
+                        <th class="text-center">계정 상태</th>
+                        <th>마지막 로그인</th>
+                        <th>생성일</th>
+                        <th class="text-center" style="width: 220px;">계정 제어</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for a in admins %}
+                    <tr>
+                        <td class="font-monospace fw-bold text-dark">{{ a.username }}</td>
+                        <td class="fw-semibold">
+                            {{ a.name }}
+                            {% if a.id == session.get('admin_id') %}
+                                <span class="badge bg-primary text-white ms-1" style="font-size: 0.65rem;">현재 본인</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ a.email }}</td>
+                        <td class="text-center">
+                            <span class="badge badge-role-{{ a.role }} px-2 py-1">
+                                {{ roles.get(a.role, a.role) }}
+                            </span>
+                        </td>
+                        <td class="text-center">
+                            {% if a.status == 'active' %}
+                                <span class="badge bg-success">활성</span>
+                            {% elif a.status == 'inactive' %}
+                                <span class="badge bg-secondary">비활성</span>
+                            {% elif a.status == 'locked' %}
+                                <span class="badge bg-danger">잠김</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-muted small">{{ a.last_login_at[:16].replace('T', ' ') if a.last_login_at else '로그인 이력 없음' }}</td>
+                        <td class="text-muted small">{{ a.created_at[:10] if a.created_at else '-' }}</td>
+                        <td class="text-center">
+                            <div class="btn-group btn-group-sm">
+                                <!-- 정보 수정 모달 버튼 -->
+                                <button type="button" class="btn btn-outline-secondary" title="정보 및 권한 수정"
+                                        data-bs-toggle="modal" data-bs-target="#editAdminModal{{ a.id }}">
+                                    <i class="bi bi-pencil"></i>
+                                </button>
+
+                                <!-- 비밀번호 초기화 모달 버튼 -->
+                                <button type="button" class="btn btn-outline-warning text-dark" title="비밀번호 초기화"
+                                        data-bs-toggle="modal" data-bs-target="#resetPwModal{{ a.id }}">
+                                    <i class="bi bi-key"></i>
+                                </button>
+
+                                <!-- 상태 토글 버튼 (활성화/비활성화) -->
+                                {% if a.id != session.get('admin_id') %}
+                                    <form method="POST" action="{{ url_for('admin.admin_toggle_status', admin_id=a.id) }}" class="d-inline"
+                                          data-confirm="정말 이 계정 상태를 {{ '비활성화' if a.status == 'active' else '활성화' }}하시겠습니까?"
+                                          data-confirm-title="관리자 계정 상태 변경"
+                                          data-confirm-btn="변경"
+                                          data-confirm-btn-class="btn-warning">
+                                        <input type="hidden" name="status" value="{{ 'inactive' if a.status == 'active' else 'active' }}">
+                                        <button type="submit" class="btn btn-outline-{{ 'secondary' if a.status == 'active' else 'success' }}"
+                                                title="{{ '계정 비활성화' if a.status == 'active' else '계정 활성화' }}">
+                                            <i class="bi bi-{{ 'slash-circle' if a.status == 'active' else 'check-circle' }}"></i>
+                                        </button>
+                                    </form>
+
+                                    <!-- 삭제 버튼 -->
+                                    <form method="POST" action="{{ url_for('admin.admin_remove', admin_id=a.id) }}" class="d-inline"
+                                          data-confirm="정말 관리자({{ a.username }}) 계정을 삭제하시겠습니까? 삭제된 관리자는 시스템에 더 이상 로그인할 수 없습니다."
+                                          data-confirm-title="관리자 계정 삭제 확인"
+                                          data-confirm-btn="삭제"
+                                          data-confirm-btn-class="btn-danger">
+                                        <button type="submit" class="btn btn-outline-danger" title="계정 삭제">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </form>
+                                {% else %}
+                                    <button type="button" class="btn btn-outline-secondary disabled" title="본인 계정은 상태 변경 및 삭제가 불가합니다">
+                                        <i class="bi bi-shield-check"></i>
+                                    </button>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+
+                    <!-- 관리자 정보 수정 모달 -->
+                    <div class="modal fade" id="editAdminModal{{ a.id }}" tabindex="-1" aria-hidden="true">
+                        <div class="modal-dialog modal-dialog-centered">
+                            <div class="modal-content border-0 shadow">
+                                <form method="POST" action="{{ url_for('admin.admin_modify', admin_id=a.id) }}"
+                                      data-confirm="관리자({{ a.username }})의 정보 및 권한을 수정하시겠습니까?"
+                                      data-confirm-title="관리자 정보/권한 변경 확인"
+                                      data-confirm-btn="수정 저장"
+                                      data-confirm-btn-class="btn-primary">
+                                    <div class="modal-header">
+                                        <h5 class="modal-title fw-bold text-dark">관리자 정보 및 권한 수정 ({{ a.username }})</h5>
+                                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                    </div>
+                                    <div class="modal-body">
+                                        <div class="mb-3">
+                                            <label class="form-label small fw-semibold text-secondary">관리자 ID</label>
+                                            <input type="text" class="form-control bg-light" value="{{ a.username }}" readonly>
+                                        </div>
+                                        <div class="mb-3">
+                                            <label class="form-label small fw-semibold text-secondary">이름</label>
+                                            <input type="text" class="form-control" name="name" value="{{ a.name }}" required>
+                                        </div>
+                                        <div class="mb-3">
+                                            <label class="form-label small fw-semibold text-secondary">이메일</label>
+                                            <input type="email" class="form-control" name="email" value="{{ a.email }}" required>
+                                        </div>
+                                        <div class="mb-3">
+                                            <label class="form-label small fw-semibold text-secondary">역할 (권한 레벨)</label>
+                                            <select class="form-select" name="role" {% if a.id == session.get('admin_id') %}disabled{% endif %}>
+                                                <option value="SUPER_ADMIN" {% if a.role == 'SUPER_ADMIN' %}selected{% endif %}>SUPER_ADMIN (최고 관리자 - 전체 권한)</option>
+                                                <option value="ADMIN" {% if a.role == 'ADMIN' %}selected{% endif %}>ADMIN (운영 관리자 - 운영 및 통계 전반)</option>
+                                                <option value="STAFF" {% if a.role == 'STAFF' %}selected{% endif %}>STAFF (상품/주문 담당자 - 운영 실무)</option>
+                                            </select>
+                                            {% if a.id == session.get('admin_id') %}
+                                            <input type="hidden" name="role" value="{{ a.role }}">
+                                            <div class="form-text small text-danger">본인 계정의 역할은 강등할 수 없습니다.</div>
+                                            {% endif %}
+                                        </div>
+                                        <div class="mb-3">
+                                            <label class="form-label small fw-semibold text-secondary">계정 상태</label>
+                                            <select class="form-select" name="status" {% if a.id == session.get('admin_id') %}disabled{% endif %}>
+                                                <option value="active" {% if a.status == 'active' %}selected{% endif %}>활성 (active)</option>
+                                                <option value="inactive" {% if a.status == 'inactive' %}selected{% endif %}>비활성 (inactive)</option>
+                                                <option value="locked" {% if a.status == 'locked' %}selected{% endif %}>잠김 (locked)</option>
+                                            </select>
+                                            {% if a.id == session.get('admin_id') %}
+                                            <input type="hidden" name="status" value="{{ a.status }}">
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                    <div class="modal-footer">
+                                        <button type="button" class="btn btn-light" data-bs-dismiss="modal">취소</button>
+                                        <button type="submit" class="btn btn-primary px-4">저장</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 비밀번호 초기화 모달 -->
+                    <div class="modal fade" id="resetPwModal{{ a.id }}" tabindex="-1" aria-hidden="true">
+                        <div class="modal-dialog modal-dialog-centered">
+                            <div class="modal-content border-0 shadow">
+                                <form method="POST" action="{{ url_for('admin.admin_reset_pw', admin_id=a.id) }}"
+                                      data-confirm="관리자({{ a.username }})의 비밀번호를 임시 비밀번호로 초기화하시겠습니까?"
+                                      data-confirm-title="비밀번호 초기화 확인"
+                                      data-confirm-btn="초기화 실행"
+                                      data-confirm-btn-class="btn-warning">
+                                    <div class="modal-header">
+                                        <h5 class="modal-title fw-bold text-warning text-dark"><i class="bi bi-key-fill me-2"></i>비밀번호 초기화 ({{ a.username }})</h5>
+                                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                    </div>
+                                    <div class="modal-body">
+                                        <p class="text-secondary small mb-3">
+                                            해당 관리자에게 전달할 새 임시 비밀번호를 입력해주세요.
+                                        </p>
+                                        <div class="mb-3">
+                                            <label class="form-label small fw-semibold text-secondary">새 임시 비밀번호 (최소 6자)</label>
+                                            <input type="password" class="form-control" name="new_password" minlength="6" placeholder="예: temp1234!" required>
+                                        </div>
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" name="must_change" id="must_change_{{ a.id }}" value="1" checked>
+                                            <label class="form-check-label small" for="must_change_{{ a.id }}">
+                                                최초 로그인 시 비밀번호 변경 강제
+                                            </label>
+                                        </div>
+                                    </div>
+                                    <div class="modal-footer">
+                                        <button type="button" class="btn btn-light" data-bs-dismiss="modal">취소</button>
+                                        <button type="submit" class="btn btn-warning text-dark px-4 fw-bold">비밀번호 변경</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- 신규 관리자 추가 모달 -->
+<div class="modal fade" id="newAdminModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <form method="POST" action="{{ url_for('admin.admin_create') }}">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title fw-bold"><i class="bi bi-person-plus-fill me-2"></i>신규 관리자 추가</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold text-secondary">관리자 ID <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" name="username" placeholder="영문/숫자 조합 아이디" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold text-secondary">이름 <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" name="name" placeholder="관리자 성명" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold text-secondary">이메일 <span class="text-danger">*</span></label>
+                        <input type="email" class="form-control" name="email" placeholder="admin@domain.com" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold text-secondary">초기 비밀번호 <span class="text-danger">*</span></label>
+                        <input type="password" class="form-control" name="password" minlength="6" placeholder="최소 6자 이상" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold text-secondary">관리자 역할(권한) <span class="text-danger">*</span></label>
+                        <select class="form-select" name="role" required>
+                            <option value="STAFF" selected>STAFF (상품/주문 담당자)</option>
+                            <option value="ADMIN">ADMIN (운영 관리자)</option>
+                            <option value="SUPER_ADMIN">SUPER_ADMIN (최고 관리자)</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold text-secondary">계정 상태</label>
+                        <select class="form-select" name="status">
+                            <option value="active" selected>활성 (즉시 사용 가능)</option>
+                            <option value="inactive">비활성 (접근 차단)</option>
+                        </select>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="must_change_password" id="create_must_change" value="1" checked>
+                        <label class="form-check-label small" for="create_must_change">
+                            로그인 시 비밀번호 변경 강제
+                        </label>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">취소</button>
+                    <button type="submit" class="btn btn-primary px-4">관리자 등록</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

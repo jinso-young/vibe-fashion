@@ -1,0 +1,120 @@
+{% extends "admin/base.html" %}
+
+{% block title %}{% if mode == 'new' %}새 상품 등록{% else %}상품 정보 수정{% endif %}{% endblock %}
+{% block page_title %}{% if mode == 'new' %}새 상품 등록{% else %}상품 정보 수정{% endif %}{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-9">
+        <div class="d-flex align-items-center justify-content-between mb-3">
+            <a href="{{ url_for('admin.products_list') }}" class="btn btn-outline-secondary btn-sm">
+                <i class="bi bi-arrow-left me-1"></i> 상품 목록으로 돌아가기
+            </a>
+
+            {% if mode == 'edit' and has_perm('product_delete') %}
+            <form method="POST" action="{{ url_for('admin.product_delete', product_id=product.id) }}" class="d-inline"
+                  data-confirm="정말 이 상품({{ product.name }})을 삭제하시겠습니까? 삭제한 상품은 복구할 수 없습니다."
+                  data-confirm-title="상품 삭제 확인"
+                  data-confirm-btn="삭제"
+                  data-confirm-btn-class="btn-danger">
+                <button type="submit" class="btn btn-outline-danger btn-sm">
+                    <i class="bi bi-trash me-1"></i> 상품 삭제
+                </button>
+            </form>
+            {% endif %}
+        </div>
+
+        <div class="admin-card">
+            <div class="admin-card-header">
+                <h5 class="fw-bold mb-0 text-dark">
+                    <i class="bi bi-box-seam me-2 text-primary"></i>
+                    {% if mode == 'new' %}신규 상품 등록{% else %}상품 정보 수정 ({{ product.name }}){% endif %}
+                </h5>
+            </div>
+            <div class="admin-card-body">
+                <form method="POST">
+                    <div class="row g-3">
+                        <!-- 상품명 -->
+                        <div class="col-md-8">
+                            <label for="name" class="form-label small fw-semibold text-secondary">상품명 <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="name" name="name" value="{{ product.name if product else '' }}" placeholder="예: 오버핏 코튼 자켓" required>
+                        </div>
+
+                        <!-- 카테고리 -->
+                        <div class="col-md-4">
+                            <label for="category_id" class="form-label small fw-semibold text-secondary">카테고리</label>
+                            <select class="form-select" id="category_id" name="category_id">
+                                <option value="">카테고리 미지정</option>
+                                {% for cat in categories %}
+                                <option value="{{ cat.id }}" {% if product and product.category_id == cat.id %}selected{% endif %}>
+                                    {{ cat.name }} ({{ cat.slug }})
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <!-- 정가(판매가) -->
+                        <div class="col-md-4">
+                            <label for="price" class="form-label small fw-semibold text-secondary">정상 판매가 (원) <span class="text-danger">*</span></label>
+                            <input type="number" class="form-control" id="price" name="price" value="{{ product.price if product else 0 }}" min="0" step="100" required>
+                        </div>
+
+                        <!-- 할인가 -->
+                        <div class="col-md-4">
+                            <label for="sale_price" class="form-label small fw-semibold text-secondary">할인 판매가 (원, 선택)</label>
+                            <input type="number" class="form-control" id="sale_price" name="sale_price" value="{{ product.sale_price if product and product.sale_price else '' }}" min="0" step="100" placeholder="할인 적용 시 입력">
+                        </div>
+
+                        <!-- 재고 수량 -->
+                        <div class="col-md-4">
+                            <label for="stock" class="form-label small fw-semibold text-secondary">초기 재고 수량 <span class="text-danger">*</span></label>
+                            <input type="number" class="form-control" id="stock" name="stock" value="{{ product.stock if product else 10 }}" min="0" required>
+                            <div class="form-text small" style="font-size: 0.75rem;">재고가 0개로 설정되면 자동으로 품절(sold_out) 처리됩니다.</div>
+                        </div>
+
+                        <!-- 판매 상태 -->
+                        <div class="col-md-4">
+                            <label for="status" class="form-label small fw-semibold text-secondary">판매 상태 <span class="text-danger">*</span></label>
+                            <select class="form-select" id="status" name="status" required>
+                                <option value="active" {% if not product or product.status == 'active' %}selected{% endif %}>판매중 (active)</option>
+                                <option value="sold_out" {% if product and product.status == 'sold_out' %}selected{% endif %}>품절 (sold_out)</option>
+                                <option value="hidden" {% if product and product.status == 'hidden' %}selected{% endif %}>판매중지/비공개 (hidden)</option>
+                            </select>
+                        </div>
+
+                        <!-- 대표 이미지 URL -->
+                        <div class="col-md-8">
+                            <label for="image_url" class="form-label small fw-semibold text-secondary">대표 썸네일 이미지 URL</label>
+                            <input type="text" class="form-control" id="image_url" name="image_url" value="{{ product.thumbnail_url if product and product.thumbnail_url else '' }}" placeholder="예: /static/images/products/... 또는 https://...">
+                        </div>
+
+                        <!-- 슬러그 (신규 등록 시) -->
+                        {% if mode == 'new' %}
+                        <div class="col-md-12">
+                            <label for="slug" class="form-label small fw-semibold text-secondary">URL 슬러그 (선택, 미입력 시 자동생성)</label>
+                            <input type="text" class="form-control" id="slug" name="slug" placeholder="예: cotton-overfit-jacket">
+                        </div>
+                        {% endif %}
+
+                        <!-- 상품 설명 -->
+                        <div class="col-md-12">
+                            <label for="description" class="form-label small fw-semibold text-secondary">상품 상세 설명</label>
+                            <textarea class="form-control" id="description" name="description" rows="5" placeholder="상품에 대한 상세 정보와 특장점을 작성해주세요.">{{ product.description if product else '' }}</textarea>
+                        </div>
+                    </div>
+
+                    <hr class="my-4">
+
+                    <div class="d-flex justify-content-end gap-2">
+                        <a href="{{ url_for('admin.products_list') }}" class="btn btn-light px-4">취소</a>
+                        <button type="submit" class="btn btn-primary px-4 shadow-sm">
+                            <i class="bi bi-check-lg me-1"></i>
+                            {% if mode == 'new' %}상품 등록 완료{% else %}수정사항 저장{% endif %}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -25,6 +25,11 @@ Thumbs.db
 .vscode/
 *.code-workspace
 
+# 인스턴스 및 로컬 데이터베이스
+instance/
+*.db
+*.sqlite3
+
 # 로그 파일
 *.log
 

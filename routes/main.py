@@ -896,7 +896,8 @@ def order_create():
     order_number = f"VF-{today_str}-{rand_4digit}{millis_suffix}"
 
     created_order_id = None
-    subtracted_options = []  # 롤백을 위한 차감 이력 [(opt_id, qty)]
+    subtracted_options = []   # 롤백을 위한 옵션 차감 이력 [(opt_id, qty)]
+    subtracted_products = []  # 롤백을 위한 상품 재고 차감 이력 [(prod_id, qty, old_status)]
 
     try:
         # 4. orders 테이블에 INSERT (status='paid', paid_at=now())
@@ -979,11 +980,29 @@ def order_create():
 
             subtracted_options.append((opt_id, qty))
 
+            # 상품 메인 재고(products.stock) 차감 및 0개 소진 시 sold_out 상태 자동 반영
+            prod_id = item.get("product_id")
+            if prod_id:
+                cur_prod_resp = admin_supabase.table("products").select("stock, status").eq("id", prod_id).execute()
+                if cur_prod_resp.data:
+                    c_p_stock = int(cur_prod_resp.data[0].get("stock") or 0)
+                    old_p_status = cur_prod_resp.data[0].get("status")
+                    new_p_stock = max(0, c_p_stock - qty)
+                    new_p_status = "sold_out" if new_p_stock == 0 else old_p_status
+
+                    admin_supabase.table("products").update({
+                        "stock": new_p_stock,
+                        "status": new_p_status,
+                        "updated_at": datetime.now(timezone.utc).isoformat()
+                    }).eq("id", prod_id).execute()
+
+                    subtracted_products.append((prod_id, qty, old_p_status))
+
         # 7. carts 아이템 DELETE
         admin_supabase.table("carts").delete().eq("user_id", user_id).execute()
 
         # 8. /order/complete/<order_id> 리다이렉트
-        complete_url = url_for("main.order_complete", order_id_or_number=created_order_id)
+        complete_url = url_for("main.order_complete", order_id=created_order_id)
 
         if request.is_json or request.headers.get("X-Requested-With") == "XMLHttpRequest":
             return jsonify({
@@ -1008,7 +1027,21 @@ def order_create():
                     c_stock = int(opt_info.data[0].get("stock") or 0)
                     admin_supabase.table("product_options").update({"stock": c_stock + qty}).eq("id", opt_id).execute()
             except Exception as re_stock_err:
-                logger.error(f"재고 롤백 실패 (opt_id={opt_id}): {re_stock_err}")
+                logger.error(f"옵션 재고 롤백 실패 (opt_id={opt_id}): {re_stock_err}")
+
+        # 롤백 처리: 이미 차감된 메인 상품 재고 및 상태 복구
+        for p_id, p_qty, old_stat in subtracted_products:
+            try:
+                p_info = admin_supabase.table("products").select("stock").eq("id", p_id).execute()
+                if p_info.data:
+                    c_stk = int(p_info.data[0].get("stock") or 0)
+                    admin_supabase.table("products").update({
+                        "stock": c_stk + p_qty,
+                        "status": old_stat,
+                        "updated_at": datetime.now(timezone.utc).isoformat()
+                    }).eq("id", p_id).execute()
+            except Exception as re_p_err:
+                logger.error(f"상품 재고 롤백 실패 (prod_id={p_id}): {re_p_err}")
 
         # 롤백 처리: 이미 생성된 주문(orders) 및 주문상품(order_items) 삭제
         if created_order_id:
@@ -1041,12 +1074,14 @@ def order_create():
         ), 400
 
 
-@main_bp.route("/order/complete/<order_id_or_number>")
-def order_complete(order_id_or_number):
+@main_bp.route("/order/complete/<order_id>")
+def order_complete(order_id):
     """
-    주문 완료 결과 페이지 (GET /order/complete/<order_id_or_number>)
-    - order_id (UUID) 또는 order_number 둘 다 지원
-    - 주문 번호, 결제 금액, 배송지 정보, 주문 아이템 요약 표시
+    주문 완료 결과 페이지 (GET /order/complete/<order_id>)
+    - 본인 주문이 맞는지 확인 (다른 사용자의 order_id 접근 차단 -> 403 Forbidden)
+    - 주문번호, 배송지, 주문 상품 목록, 결제 금액 표시
+    - "마이페이지로" 버튼
+    - "쇼핑 계속하기" 버튼
     """
     user_id = session.get("user_id")
     if not user_id:
@@ -1057,22 +1092,29 @@ def order_complete(order_id_or_number):
         else:
             return redirect(url_for("auth.login", error="login_required"))
 
+    # RLS 우회 및 타인 주문 확인을 위해 admin_client 우선 사용
     supabase = get_supabase_admin_client() or get_supabase_client()
     if not supabase:
         abort(500)
 
     try:
         # UUID 형식 여부에 따라 id 또는 order_number로 주문 조회
-        query = supabase.table("orders").select("*").eq("user_id", user_id)
-        if re.match(r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$", order_id_or_number):
-            order_resp = query.eq("id", order_id_or_number).execute()
+        is_uuid = bool(re.match(r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$", str(order_id)))
+        if is_uuid:
+            order_resp = supabase.table("orders").select("*").eq("id", order_id).execute()
         else:
-            order_resp = query.eq("order_number", order_id_or_number).execute()
+            order_resp = supabase.table("orders").select("*").eq("order_number", order_id).execute()
 
+        # 존재하지 않는 주문일 경우 404
         if not order_resp.data:
             abort(404)
 
         order = order_resp.data[0]
+
+        # [본인 확인] 본인 주문이 맞는지 검증 (다른 사용자의 order_id 접근 차단)
+        if str(order.get("user_id")) != str(user_id):
+            logger.warning(f"타인 주문 접근 차단 감지: 접속 user_id={user_id}, 주문 user_id={order.get('user_id')}, order_id={order_id}")
+            abort(403)
 
         # 주문 상품 항목 조회
         items_resp = supabase.table("order_items")\
@@ -1123,27 +1165,9 @@ def order_complete(order_id_or_number):
             brand_name="VIBE-FASHION"
         )
     except Exception as e:
-        logger.error(f"주문 완료 페이지 조회 실패: {e}")
-        abort(500)
-
-        formatted_created_at = order.get("created_at", "")
-        try:
-            dt = datetime.fromisoformat(formatted_created_at.replace("Z", "+00:00"))
-            formatted_created_at = dt.strftime("%Y년 %m월 %d일 %H:%M")
-        except Exception:
-            pass
-
-        return render_template(
-            "order_complete.html",
-            order=order,
-            order_items=order_items,
-            formatted_created_at=formatted_created_at,
-            formatted_total_amount=f"{total_amount:,}원",
-            formatted_shipping_fee="무료" if shipping_fee == 0 else f"{shipping_fee:,}원",
-            formatted_final_amount=f"{final_amount:,}원",
-            brand_name="VIBE-FASHION"
-        )
-    except Exception as e:
+        from werkzeug.exceptions import HTTPException
+        if isinstance(e, HTTPException):
+            raise e
         logger.error(f"주문 완료 페이지 조회 실패: {e}")
         abort(500)
 

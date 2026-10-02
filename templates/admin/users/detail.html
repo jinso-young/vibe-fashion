@@ -1,0 +1,177 @@
+{% extends "admin/base.html" %}
+
+{% block title %}회원 상세 정보{% endblock %}
+{% block page_title %}회원 상세 정보{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-3">
+    <a href="{{ url_for('admin.users_list') }}" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-arrow-left me-1"></i> 회원 목록으로
+    </a>
+
+    {% if has_perm('user_delete') %}
+    <form method="POST" action="{{ url_for('admin.user_delete', user_id=user.id) }}" class="d-inline"
+          data-confirm="정말 이 회원({{ user.email }})을 삭제하시겠습니까? 삭제한 회원은 복구할 수 없습니다."
+          data-confirm-title="회원 삭제 확인"
+          data-confirm-btn="영구 삭제"
+          data-confirm-btn-class="btn-danger">
+        <button type="submit" class="btn btn-outline-danger btn-sm">
+            <i class="bi bi-trash-fill me-1"></i> 회원 삭제
+        </button>
+    </form>
+    {% endif %}
+</div>
+
+<div class="row g-3">
+    <!-- 회원 요약 카드 & 정보 수정 -->
+    <div class="col-lg-5">
+        <div class="admin-card mb-3">
+            <div class="admin-card-header">
+                <h6 class="fw-bold mb-0 text-dark"><i class="bi bi-person-lines-fill text-primary me-2"></i>회원 기본 정보</h6>
+                <span class="badge bg-light text-dark border">{{ user.role }}</span>
+            </div>
+            <div class="admin-card-body">
+                <form method="POST" action="{{ url_for('admin.user_edit', user_id=user.id) }}">
+                    <div class="mb-3">
+                        <label class="form-label small text-secondary fw-semibold">회원 고유 ID (UUID)</label>
+                        <input type="text" class="form-control form-control-sm bg-light" value="{{ user.id }}" readonly>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label small text-secondary fw-semibold">이메일 계정</label>
+                        <input type="email" class="form-control form-control-sm bg-light" value="{{ user.email }}" readonly>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="full_name" class="form-label small text-secondary fw-semibold">회원 이름</label>
+                        <input type="text" class="form-control form-control-sm" id="full_name" name="full_name" value="{{ user.full_name or '' }}" {% if not has_perm('user_edit') %}readonly{% endif %}>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="phone" class="form-label small text-secondary fw-semibold">연락처</label>
+                        <input type="text" class="form-control form-control-sm" id="phone" name="phone" value="{{ user.phone or '' }}" {% if not has_perm('user_edit') %}readonly{% endif %}>
+                    </div>
+
+                    <div class="mb-4">
+                        <label for="grade" class="form-label small text-secondary fw-semibold">회원 등급</label>
+                        <select class="form-select form-select-sm" id="grade" name="grade" {% if not has_perm('user_edit') %}disabled{% endif %}>
+                            <option value="BRONZE" {% if user.grade == 'BRONZE' %}selected{% endif %}>BRONZE</option>
+                            <option value="SILVER" {% if user.grade == 'SILVER' %}selected{% endif %}>SILVER</option>
+                            <option value="GOLD" {% if user.grade == 'GOLD' %}selected{% endif %}>GOLD</option>
+                            <option value="VIP" {% if user.grade == 'VIP' %}selected{% endif %}>VIP</option>
+                        </select>
+                    </div>
+
+                    {% if has_perm('user_edit') %}
+                    <button type="submit" class="btn btn-primary btn-sm w-100">
+                        <i class="bi bi-check2 me-1"></i> 회원 정보 수정 저장
+                    </button>
+                    {% else %}
+                    <div class="text-muted small text-center p-2 bg-light rounded">
+                        <i class="bi bi-lock-fill me-1"></i> 정보 수정 권한이 없습니다 (STAFF)
+                    </div>
+                    {% endif %}
+                </form>
+            </div>
+        </div>
+
+        <!-- 구매 통계 요약 카드 -->
+        <div class="admin-card">
+            <div class="admin-card-header">
+                <h6 class="fw-bold mb-0 text-dark"><i class="bi bi-graph-up text-success me-2"></i>구매 활동 통계</h6>
+            </div>
+            <div class="admin-card-body p-3">
+                <div class="row g-2 text-center">
+                    <div class="col-6">
+                        <div class="p-3 bg-light rounded border">
+                            <span class="text-muted small d-block">총 구매 횟수</span>
+                            <span class="fs-4 fw-bold text-primary">{{ user.order_count or 0 }}건</span>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="p-3 bg-light rounded border">
+                            <span class="text-muted small d-block">총 결제 금액</span>
+                            <span class="fs-4 fw-bold text-success">{{ "{:,}".format(user.total_spent or 0) }}원</span>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="p-2 bg-light rounded border text-start px-3">
+                            <span class="text-muted small d-block" style="font-size: 0.75rem;">가입일시</span>
+                            <span class="small fw-semibold">{{ user.created_at[:16].replace('T', ' ') if user.created_at else '-' }}</span>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="p-2 bg-light rounded border text-start px-3">
+                            <span class="text-muted small d-block" style="font-size: 0.75rem;">최근 주문일</span>
+                            <span class="small fw-semibold">{{ user.latest_order_date[:10] if user.latest_order_date else '-' }}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 주문 내역 목록 -->
+    <div class="col-lg-7">
+        <div class="admin-card">
+            <div class="admin-card-header">
+                <h6 class="fw-bold mb-0 text-dark"><i class="bi bi-receipt-cutoff text-info me-2"></i>회원 주문 내역</h6>
+                <span class="badge bg-secondary">{{ orders|length }}건</span>
+            </div>
+            <div class="admin-card-body p-0">
+                {% if orders %}
+                <div class="table-responsive">
+                    <table class="table table-admin mb-0">
+                        <thead>
+                            <tr>
+                                <th>주문번호</th>
+                                <th class="text-end">결제금액</th>
+                                <th class="text-center">상태</th>
+                                <th>주문일시</th>
+                                <th class="text-center">상세</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for ord in orders %}
+                            <tr>
+                                <td class="font-monospace fw-semibold text-primary small">{{ ord.order_number }}</td>
+                                <td class="text-end fw-bold">{{ "{:,}".format(ord.final_amount or 0) }}원</td>
+                                <td class="text-center">
+                                    {% if ord.status == 'pending' %}
+                                        <span class="badge bg-secondary">결제대기</span>
+                                    {% elif ord.status == 'paid' %}
+                                        <span class="badge bg-primary">결제완료</span>
+                                    {% elif ord.status == 'shipping' %}
+                                        <span class="badge bg-info text-dark">배송중</span>
+                                    {% elif ord.status == 'delivered' %}
+                                        <span class="badge bg-success">배송완료</span>
+                                    {% elif ord.status == 'completed' %}
+                                        <span class="badge bg-success">구매확정</span>
+                                    {% elif ord.status == 'cancelled' %}
+                                        <span class="badge bg-danger">취소됨</span>
+                                    {% else %}
+                                        <span class="badge bg-light text-dark">{{ ord.status }}</span>
+                                    {% endif %}
+                                </td>
+                                <td class="text-muted small">{{ ord.created_at[:16].replace('T', ' ') if ord.created_at else '-' }}</td>
+                                <td class="text-center">
+                                    <a href="{{ url_for('admin.order_detail', order_id=ord.id) }}" class="btn btn-sm btn-outline-secondary py-0 px-2" style="font-size: 0.75rem;">
+                                        조회
+                                    </a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="p-5 text-center text-muted">
+                    <i class="bi bi-cart-x fs-1 d-block mb-2 text-secondary"></i>
+                    주문 내역이 존재하지 않습니다.
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

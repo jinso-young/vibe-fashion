@@ -1,0 +1,99 @@
+{% extends "admin/base.html" %}
+
+{% block title %}회원 관리{% endblock %}
+{% block page_title %}회원 관리{% endblock %}
+
+{% block content %}
+<div class="admin-card">
+    <div class="admin-card-header flex-wrap gap-2">
+        <div class="d-flex align-items-center gap-2">
+            <h5 class="fw-bold mb-0 text-dark"><i class="bi bi-people-fill text-primary me-2"></i>회원 목록</h5>
+            <span class="badge bg-light text-secondary border">총 {{ users|length }}명</span>
+        </div>
+
+        <!-- 검색 및 정렬 폼 -->
+        <form method="GET" action="{{ url_for('admin.users_list') }}" class="d-flex align-items-center gap-2 flex-wrap">
+            <select name="sort_by" class="form-select form-select-sm" style="width: auto;" onchange="this.form.submit()">
+                <option value="created_at_desc" {% if sort_by == 'created_at_desc' %}selected{% endif %}>가입일 최신순</option>
+                <option value="created_at_asc" {% if sort_by == 'created_at_asc' %}selected{% endif %}>가입일 과거순</option>
+                <option value="spent_desc" {% if sort_by == 'spent_desc' %}selected{% endif %}>구매금액 높은순</option>
+                <option value="spent_asc" {% if sort_by == 'spent_asc' %}selected{% endif %}>구매금액 낮은순</option>
+                <option value="orders_desc" {% if sort_by == 'orders_desc' %}selected{% endif %}>주문건수 많은순</option>
+            </select>
+
+            <div class="input-group input-group-sm" style="width: 260px;">
+                <input type="text" name="search" class="form-control" placeholder="이름, 이메일, 연락처 검색" value="{{ search or '' }}">
+                <button type="submit" class="btn btn-outline-secondary">
+                    <i class="bi bi-search"></i>
+                </button>
+                {% if search %}
+                    <a href="{{ url_for('admin.users_list') }}" class="btn btn-outline-danger" title="초기화">
+                        <i class="bi bi-x-lg"></i>
+                    </a>
+                {% endif %}
+            </div>
+        </form>
+    </div>
+
+    <div class="admin-card-body p-0">
+        {% if users %}
+        <div class="table-responsive">
+            <table class="table table-admin mb-0">
+                <thead>
+                    <tr>
+                        <th style="width: 100px;">회원번호</th>
+                        <th>이름</th>
+                        <th>이메일</th>
+                        <th>연락처</th>
+                        <th class="text-center">회원등급</th>
+                        <th class="text-center">구매 횟수</th>
+                        <th class="text-end">총 구매 금액</th>
+                        <th>가입일</th>
+                        <th class="text-center" style="width: 130px;">관리</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for u in users %}
+                    <tr>
+                        <td class="font-monospace text-muted small">{{ u.id[:8] }}</td>
+                        <td class="fw-semibold">{{ u.full_name or '이름 미등록' }}</td>
+                        <td>{{ u.email }}</td>
+                        <td class="text-secondary small">{{ u.phone or '-' }}</td>
+                        <td class="text-center">
+                            <span class="badge bg-light text-dark border">{{ u.grade or 'BRONZE' }}</span>
+                        </td>
+                        <td class="text-center fw-medium">{{ u.order_count or 0 }}건</td>
+                        <td class="text-end fw-bold text-dark">{{ "{:,}".format(u.computed_spent or 0) }}원</td>
+                        <td class="text-muted small">{{ u.created_at[:10] if u.created_at else '-' }}</td>
+                        <td class="text-center">
+                            <div class="btn-group btn-group-sm">
+                                <a href="{{ url_for('admin.user_detail', user_id=u.id) }}" class="btn btn-outline-primary" title="상세보기">
+                                    <i class="bi bi-search"></i> 상세
+                                </a>
+                                {% if has_perm('user_delete') %}
+                                <form method="POST" action="{{ url_for('admin.user_delete', user_id=u.id) }}" class="d-inline"
+                                      data-confirm="정말 {{ u.email }} 회원을 삭제하시겠습니까? 삭제된 회원의 모든 데이터는 복구할 수 없습니다."
+                                      data-confirm-title="회원 영구 삭제"
+                                      data-confirm-btn="삭제"
+                                      data-confirm-btn-class="btn-danger">
+                                    <button type="submit" class="btn btn-outline-danger" title="회원 삭제">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </form>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="p-5 text-center text-muted">
+            <i class="bi bi-person-x fs-1 d-block mb-2 text-secondary"></i>
+            조건에 일치하는 회원이 없습니다.
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

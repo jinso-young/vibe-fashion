@@ -1,0 +1,99 @@
+{% extends "admin/base.html" %}
+
+{% block title %}시스템 설정 (SUPER_ADMIN){% endblock %}
+{% block page_title %}쇼핑몰 시스템 설정{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="admin-card">
+            <div class="admin-card-header">
+                <h5 class="fw-bold mb-0 text-dark">
+                    <i class="bi bi-sliders text-primary me-2"></i>운영 정책 및 시스템 설정
+                </h5>
+                <span class="badge bg-danger">최고 관리자 전용</span>
+            </div>
+            <div class="admin-card-body">
+                <form method="POST" action="{{ url_for('admin.settings_page') }}"
+                      data-confirm="쇼핑몰 시스템 설정을 저장하시겠습니까?"
+                      data-confirm-title="설정 변경 확인"
+                      data-confirm-btn="저장"
+                      data-confirm-btn-class="btn-primary">
+                    <div class="row g-3">
+                        <div class="col-12">
+                            <h6 class="fw-bold text-dark border-bottom pb-2 mb-3">
+                                <i class="bi bi-shop me-1 text-secondary"></i> 쇼핑몰 기본 정보
+                            </h6>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label for="shop_name" class="form-label small fw-semibold text-secondary">쇼핑몰 상호명</label>
+                            <input type="text" class="form-control" id="shop_name" name="shop_name" value="{{ settings.shop_name or 'VIBE FASHION' }}" required>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label for="company_name" class="form-label small fw-semibold text-secondary">회사/법인명</label>
+                            <input type="text" class="form-control" id="company_name" name="company_name" value="{{ settings.company_name or '(주) 바이브 패션' }}" required>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label for="cs_phone" class="form-label small fw-semibold text-secondary">고객센터 전화번호</label>
+                            <input type="text" class="form-control" id="cs_phone" name="cs_phone" value="{{ settings.cs_phone or '1588-0000' }}" required>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label for="cs_email" class="form-label small fw-semibold text-secondary">고객센터 이메일</label>
+                            <input type="email" class="form-control" id="cs_email" name="cs_email" value="{{ settings.cs_email or 'cs@vibefashion.com' }}" required>
+                        </div>
+
+                        <div class="col-12 mt-4">
+                            <h6 class="fw-bold text-dark border-bottom pb-2 mb-3">
+                                <i class="bi bi-box-seam me-1 text-secondary"></i> 재고 및 배송 정책
+                            </h6>
+                        </div>
+
+                        <div class="col-md-4">
+                            <label for="low_stock_threshold" class="form-label small fw-semibold text-secondary">
+                                재고 부족 알림 기준 수량
+                            </label>
+                            <div class="input-group">
+                                <input type="number" class="form-control" id="low_stock_threshold" name="low_stock_threshold" value="{{ settings.low_stock_threshold or '5' }}" min="1" max="100" required>
+                                <span class="input-group-text bg-light">개 이하</span>
+                            </div>
+                            <div class="form-text small" style="font-size: 0.75rem;">대시보드 및 재고관리에 경고 알림으로 표시됩니다.</div>
+                        </div>
+
+                        <div class="col-md-4">
+                            <label for="free_shipping_min" class="form-label small fw-semibold text-secondary">
+                                무료 배송 기준 금액 (원)
+                            </label>
+                            <div class="input-group">
+                                <input type="number" class="form-control" id="free_shipping_min" name="free_shipping_min" value="{{ settings.free_shipping_min or '50000' }}" min="0" step="1000" required>
+                                <span class="input-group-text bg-light">원 이상</span>
+                            </div>
+                        </div>
+
+                        <div class="col-md-4">
+                            <label for="default_shipping_fee" class="form-label small fw-semibold text-secondary">
+                                기본 배송비 (원)
+                            </label>
+                            <div class="input-group">
+                                <input type="number" class="form-control" id="default_shipping_fee" name="default_shipping_fee" value="{{ settings.default_shipping_fee or '3000' }}" min="0" step="500" required>
+                                <span class="input-group-text bg-light">원</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <hr class="my-4">
+
+                    <div class="d-flex justify-content-end">
+                        <button type="submit" class="btn btn-primary px-4 shadow-sm">
+                            <i class="bi bi-check-lg me-1"></i> 시스템 설정 저장
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

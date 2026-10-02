@@ -1,0 +1,96 @@
+{% extends "admin/base.html" %}
+
+{% block title %}관리자 활동 감사 로그{% endblock %}
+{% block page_title %}관리자 활동 감사 로그{% endblock %}
+
+{% block content %}
+<div class="admin-card">
+    <div class="admin-card-header flex-wrap gap-2">
+        <div class="d-flex align-items-center gap-2">
+            <h5 class="fw-bold mb-0 text-dark"><i class="bi bi-journal-text text-primary me-2"></i>보안 감사 및 활동 로그</h5>
+            <span class="badge bg-light text-secondary border">최근 {{ logs|length }}건</span>
+        </div>
+
+        <!-- 필터 및 검색 폼 -->
+        <form method="GET" action="{{ url_for('admin.logs_list') }}" class="d-flex align-items-center gap-2 flex-wrap">
+            <select name="action" class="form-select form-select-sm" style="width: auto;" onchange="this.form.submit()">
+                <option value="">모든 작업 유형</option>
+                <option value="로그인" {% if action_filter == '로그인' %}selected{% endif %}>로그인</option>
+                <option value="로그아웃" {% if action_filter == '로그아웃' %}selected{% endif %}>로그아웃</option>
+                <option value="상품" {% if action_filter == '상품' %}selected{% endif %}>상품 관련 작업</option>
+                <option value="주문" {% if action_filter == '주문' %}selected{% endif %}>주문 관련 작업</option>
+                <option value="재고" {% if action_filter == '재고' %}selected{% endif %}>재고 수정</option>
+                <option value="회원" {% if action_filter == '회원' %}selected{% endif %}>회원 관련 작업</option>
+                <option value="환불" {% if action_filter == '환불' %}selected{% endif %}>환불 처리</option>
+                <option value="관리자" {% if action_filter == '관리자' %}selected{% endif %}>관리자 계정 관리</option>
+                <option value="설정" {% if action_filter == '설정' %}selected{% endif %}>시스템 설정</option>
+            </select>
+
+            <div class="input-group input-group-sm" style="width: 220px;">
+                <input type="text" name="search" class="form-control" placeholder="관리자명, 대상 검색" value="{{ search or '' }}">
+                <button type="submit" class="btn btn-outline-secondary">
+                    <i class="bi bi-search"></i>
+                </button>
+                {% if search or action_filter %}
+                    <a href="{{ url_for('admin.logs_list') }}" class="btn btn-outline-danger" title="초기화">
+                        <i class="bi bi-x-lg"></i>
+                    </a>
+                {% endif %}
+            </div>
+        </form>
+    </div>
+
+    <div class="admin-card-body p-0">
+        {% if logs %}
+        <div class="table-responsive">
+            <table class="table table-admin mb-0">
+                <thead>
+                    <tr>
+                        <th style="width: 160px;">일시</th>
+                        <th>관리자</th>
+                        <th class="text-center" style="width: 130px;">수행 작업</th>
+                        <th>작업 대상</th>
+                        <th>상세 내용</th>
+                        <th class="text-center" style="width: 80px;">결과</th>
+                        <th class="text-muted" style="width: 120px;">접속 IP</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for l in logs %}
+                    <tr>
+                        <td class="text-muted small font-monospace">{{ l.created_at }}</td>
+                        <td>
+                            <div class="fw-semibold text-dark">{{ l.admin_name }}</div>
+                            <small class="text-muted font-monospace">@{{ l.admin_username }}</small>
+                        </td>
+                        <td class="text-center">
+                            <span class="badge bg-light text-dark border px-2 py-1">{{ l.action }}</span>
+                        </td>
+                        <td>
+                            <span class="fw-medium text-dark">{{ l.target }}</span>
+                        </td>
+                        <td class="text-secondary small text-break">
+                            {{ l.details }}
+                        </td>
+                        <td class="text-center">
+                            {% if l.result == '성공' %}
+                                <span class="badge bg-success">성공</span>
+                            {% else %}
+                                <span class="badge bg-danger">실패</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-muted small font-monospace">{{ l.ip_address or '-' }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="p-5 text-center text-muted">
+            <i class="bi bi-journal-x fs-1 d-block mb-2 text-secondary"></i>
+            조건에 일치하는 활동 로그가 없습니다.
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
